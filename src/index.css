@@ -1,0 +1,68 @@
+@import "tailwindcss";
+
+@theme {
+  --color-black: #000000;
+  --color-base: #121212;
+  --color-surface: #181818;
+  --color-surface-2: #242424;
+  --color-surface-3: #2f2f2f;
+  --color-border: #2a2a2a;
+  --color-fg: #ffffff;
+  --color-muted: #a7a7a7;
+  --color-accent: #7c5cff;
+  --color-accent-2: #ec4899;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  @apply bg-base text-fg antialiased;
+  font-feature-settings: "cv11", "ss01";
+}
+
+* {
+  scrollbar-color: var(--color-surface-3) transparent;
+}
+
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: var(--color-surface-3);
+  border-radius: 9999px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #34343f;
+}
+
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+.no-scrollbar {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+.gradient-text {
+  background-image: linear-gradient(135deg, var(--color-accent), var(--color-accent-2));
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+/* Brand mark only (logo) — interactive chrome uses the flat bg-accent utility instead. */
+.brand-mark {
+  background-image: linear-gradient(135deg, var(--color-accent), var(--color-accent-2));
+}
+
+.pill {
+  border-radius: 9999px;
+}
