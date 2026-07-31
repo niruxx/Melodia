@@ -46,11 +46,18 @@ export function NowPlayingBar() {
   const openDeviceModal = useNetworkStore((s) => s.openDeviceModal);
   const disconnectDevice = useNetworkStore((s) => s.disconnect);
 
+  const playbackError = usePlayerStore((s) => s.playbackError);
+
   const VolumeIcon = volume === 0 ? VolumeX : volume < 0.5 ? Volume1 : Volume2;
   const RepeatIcon = repeat === "one" ? Repeat1 : Repeat;
 
   return (
     <div className="flex shrink-0 flex-col bg-black">
+      {playbackError && (
+        <div className="flex items-center justify-center gap-2 bg-red-500/15 px-4 py-1.5 text-xs text-red-400">
+          {playbackError}
+        </div>
+      )}
       {networkRole !== "idle" && (
         <div className="flex items-center justify-center gap-2 bg-accent/15 px-4 py-1.5 text-xs text-accent">
           <Cast size={13} />

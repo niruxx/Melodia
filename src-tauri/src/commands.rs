@@ -2,6 +2,8 @@ use serde_json::Value;
 use tauri::State;
 
 use crate::discord::Discord;
+use crate::equalizer::BAND_COUNT;
+use crate::playback::Playback;
 use crate::sidecar::Sidecar;
 
 #[tauri::command]
@@ -104,4 +106,73 @@ pub async fn discord_update_presence(
 #[tauri::command]
 pub async fn discord_disconnect(discord: State<'_, Discord>) -> Result<(), String> {
     discord.disconnect().await
+}
+
+#[tauri::command]
+pub async fn playback_play(
+    sidecar: State<'_, Sidecar>,
+    playback: State<'_, Playback>,
+    video_id: String,
+) -> Result<(), String> {
+    let data = sidecar
+        .call("get_stream_url", serde_json::json!({ "videoId": video_id }))
+        .await?;
+    let url = data
+        .get("url")
+        .and_then(Value::as_str)
+        .ok_or_else(|| "couldn't resolve an audio stream for this track".to_string())?
+        .to_string();
+    let headers = data
+        .get("headers")
+        .and_then(Value::as_object)
+        .map(|obj| {
+            obj.iter()
+                .filter_map(|(k, v)| v.as_str().map(|s| (k.clone(), s.to_string())))
+                .collect()
+        })
+        .unwrap_or_default();
+    playback.play(url, headers)
+}
+
+#[tauri::command]
+pub fn playback_play_local(playback: State<'_, Playback>, path: String) -> Result<(), String> {
+    playback.play_local(path)
+}
+
+#[tauri::command]
+pub fn playback_pause(playback: State<'_, Playback>) -> Result<(), String> {
+    playback.pause()
+}
+
+#[tauri::command]
+pub fn playback_resume(playback: State<'_, Playback>) -> Result<(), String> {
+    playback.resume()
+}
+
+#[tauri::command]
+pub fn playback_seek(playback: State<'_, Playback>, seconds: f64) -> Result<(), String> {
+    playback.seek(seconds)
+}
+
+#[tauri::command]
+pub fn playback_set_volume(playback: State<'_, Playback>, volume: f32) -> Result<(), String> {
+    playback.set_volume(volume)
+}
+
+#[tauri::command]
+pub fn playback_set_fade_ms(playback: State<'_, Playback>, ms: u32) -> Result<(), String> {
+    playback.set_fade_ms(ms)
+}
+
+#[tauri::command]
+pub fn playback_set_eq(
+    playback: State<'_, Playback>,
+    bands: [f32; BAND_COUNT],
+) -> Result<(), String> {
+    playback.set_eq(bands)
+}
+
+#[tauri::command]
+pub fn playback_stop(playback: State<'_, Playback>) -> Result<(), String> {
+    playback.stop()
 }

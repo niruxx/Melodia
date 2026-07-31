@@ -15,16 +15,17 @@ Built with 🦀 [Tauri](https://tauri.app), ⚛️ React + TypeScript, and 🎨 
 ## ✨ Features
 
 - 🖤 **Modern, Spotify-inspired UI** — dark, dense two-panel sidebar, card grids, a full-width Now Playing bar, and a fullscreen "now playing" view
+- 🔊 **Real audio playback** — actual songs stream and play, decoded natively in Rust, not simulated
 - 🔐 **Real YouTube Music sign-in** — Google OAuth device-code flow (no password entry, no browser redirect dance)
 - 📚 **Real library sync** — your actual playlists, albums, home feed, recently played, and search, pulled live from your account
+- 💿 **Local music folder** — a "Local" tab plays songs straight off your disk (title/artist/album/art read from file tags), alongside YouTube Music, switchable any time
+- 🎚️ **Fade in / out & 5-band equalizer** — smooth volume ramps on play/pause/stop, plus a graphic EQ (60Hz–12kHz) tunable per session
 - 💚 **Liked Songs** — a dedicated, always-pinned playlist for anything you heart
 - 📝 **Lyrics** — fetched live and shown in the fullscreen player
 - 🎮 **Discord Rich Presence** — optionally show what you're listening to on your Discord profile
 - 📡 **Connect to a device** — control playback on another device running TuneBox on your local network (Spotify-Connect-style): pick a device, and playback moves there until you disconnect
 - 🪟 **Custom titlebar** — no native window chrome; a slim, draggable, themed titlebar with its own window controls
 - 🧩 **Cross-platform** — one codebase targets Windows, macOS, and Linux
-
-> ⚠️ **Playback is currently simulated.** Queue, shuffle, repeat, seeking, and progress all work, but no real audio is streamed yet — that's the next big piece (see the Roadmap section below).
 
 ---
 
@@ -41,6 +42,10 @@ Built with 🦀 [Tauri](https://tauri.app), ⚛️ React + TypeScript, and 🎨 
 | YouTube Music data | [ytmusicapi](https://github.com/sigma67/ytmusicapi) via a small Python sidecar process |
 | Rich Presence | [discord-rich-presence](https://github.com/vionya/discord-rich-presence) (Rust) |
 | LAN device discovery | [mdns-sd](https://github.com/keepsimple1/mdns-sd) (Rust) |
+| Audio playback | [rodio](https://github.com/RustAudio/rodio) + [reqwest](https://github.com/seanmonstar/reqwest) (Rust) |
+| Audio stream resolution | [yt-dlp](https://github.com/yt-dlp/yt-dlp) via the Python sidecar |
+| Local file tag reading | [lofty](https://github.com/Serial-ATA/lofty-rs) + [walkdir](https://github.com/BurntSushi/walkdir) (Rust) |
+| Folder picker | [tauri-plugin-dialog](https://github.com/tauri-apps/plugins-workspace) |
 
 ---
 
@@ -107,26 +112,40 @@ Then, in TuneBox:
 
 ---
 
+## 💿 Playing Local Files
+
+TuneBox can also play music straight from a folder on your computer, no YouTube Music account needed:
+
+1. Click the ⚙️ **gear icon** in the top bar, and under **Local music folder**, click **Choose folder…**
+2. TuneBox scans it (recursively) for `.mp3`, `.m4a`, `.aac`, `.flac`, `.wav`, and `.ogg` files, reading title/artist/album/cover art from each file's tags (falling back to the filename and folder name when tags are missing)
+3. Switch to the **Local** tab at the top of the sidebar to browse and play
+
+---
+
 ## 🎮 Discord Rich Presence (optional)
 
-Show your currently playing song on your Discord profile.
+Show your currently playing song on your Discord profile. No per-user setup — just:
+
+1. Click the ⚙️ **gear icon** in the top bar
+2. Click **Enable**
+3. Make sure Discord desktop is running — your presence will update automatically as you play tracks
+
+This isn't a bot — no bot token, no server permissions, nothing gets added anywhere. Discord's Rich Presence protocol just requires *some* Application ID in its connection handshake so it knows whose name/icon to show, so TuneBox ships with its own, defined in `src/lib/discordConfig.ts`.
 
 <details>
-<summary><strong>📖 One-time setup: create a free Discord Application ID (~1 minute)</strong></summary>
+<summary><strong>📖 Maintainers: providing TuneBox's Discord Application ID</strong></summary>
 
 <br>
 
+`src/lib/discordConfig.ts` ships with a placeholder `DISCORD_APP_ID`. To make Rich Presence work in your build:
+
 1. Go to the [Discord Developer Portal](https://discord.com/developers/applications)
-2. Click **New Application**, name it "TuneBox" (or anything you like)
-3. Copy the **Application ID** from the General Information tab
+2. Click **New Application**, name it "TuneBox" (or anything you like) — takes under a minute, no approval needed
+3. Copy the **Application ID** from the General Information tab and paste it into `DISCORD_APP_ID`
+
+Every end user then just sees the plain Enable toggle above — nobody else needs to touch this.
 
 </details>
-
-Then, in TuneBox:
-
-1. Click the ⚙️ **gear icon** in the top bar
-2. Paste your **Discord Application ID** and click **Enable**
-3. Make sure Discord desktop is running — your presence will update automatically as you play tracks
 
 ---
 
@@ -145,20 +164,25 @@ TuneBox/
 │       ├── lib.rs           # App entry point, command registration
 │       ├── commands.rs      # Tauri commands exposed to the frontend
 │       ├── sidecar.rs       # Spawns/talks to the Python sidecar over stdio
-│       └── discord.rs       # Discord Rich Presence IPC client
+│       ├── discord.rs       # Discord Rich Presence IPC client
+│       ├── network.rs       # LAN device discovery + control (mDNS + TCP)
+│       ├── playback.rs      # Dedicated audio thread: fetch, decode, play, fades
+│       ├── equalizer.rs     # 5-band graphic EQ (custom rodio Source wrapper)
+│       └── local_library.rs # Local folder scan + tag reading (lofty)
 └── sidecar/                # Python sidecar
-    └── main.py               # stdin/stdout JSON bridge around ytmusicapi
+    └── main.py               # stdin/stdout JSON bridge around ytmusicapi + yt-dlp
 ```
 
 ---
 
 ## 🗺️ Roadmap / Known Limitations
 
-- 🔇 **No real audio playback yet** — the player is fully functional at the UI/state level (queue, shuffle, repeat, seek), but doesn't stream actual audio. Planned: resolve stream URLs and decode/play them natively in Rust.
 - 📦 **No packaged installers yet** — `npm run tauri build` produces a binary, but signed installers/auto-update aren't set up.
 - 🔑 **Bring-your-own OAuth client** — by design (see above), for reliability and to avoid shared-credential rate limits.
 - 🍎 **One titlebar style everywhere** — the custom titlebar uses the same right-aligned controls on Windows, macOS, and Linux rather than native macOS traffic lights.
 - 🔓 **LAN device control has no encryption** — beyond the on-device Accept/Decline prompt, there's no auth on the local control connection; fine for a trusted home network, not intended for untrusted networks.
+- ⏳ **Playback buffers the full track before playing** rather than true progressive streaming — simpler and more robust, at the cost of a short delay (typically a couple seconds) before audio starts. Stream resolution and downloading happen on a background thread, so rapid back-to-back skipping stays responsive, but stream URLs aren't cached, so replaying a track re-resolves and re-downloads it.
+- 📡 **Local tracks can't be cast to another device** — "Connect to a device" only works for YouTube tracks today, since the controlled device wouldn't have the same file on its own disk.
 
 ---
 

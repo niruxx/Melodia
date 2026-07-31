@@ -1,10 +1,14 @@
 mod commands;
 mod discord;
+mod equalizer;
+mod local_library;
 mod network;
+mod playback;
 mod sidecar;
 
 use discord::Discord;
 use network::NetworkState;
+use playback::Playback;
 use sidecar::Sidecar;
 use std::sync::Arc;
 use tauri::Manager;
@@ -19,12 +23,14 @@ fn greet(name: &str) -> String {
 pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
+        .plugin(tauri_plugin_dialog::init())
         .setup(|app| {
             let data_dir = app.path().app_data_dir()?;
             let sidecar = Sidecar::spawn(data_dir).map_err(std::io::Error::other)?;
             app.manage(sidecar);
             app.manage(Discord::new());
             app.manage(Arc::new(NetworkState::new()));
+            app.manage(Playback::spawn(app.handle().clone()));
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
@@ -50,6 +56,18 @@ pub fn run() {
             network::network_send_command,
             network::network_broadcast_state,
             network::network_disconnect,
+            commands::playback_play,
+            commands::playback_play_local,
+            commands::playback_pause,
+            commands::playback_resume,
+            commands::playback_seek,
+            commands::playback_set_volume,
+            commands::playback_set_fade_ms,
+            commands::playback_set_eq,
+            commands::playback_stop,
+            local_library::local_get_folder,
+            local_library::local_set_folder,
+            local_library::local_scan,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

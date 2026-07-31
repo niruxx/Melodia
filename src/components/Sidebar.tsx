@@ -1,15 +1,22 @@
 import { useState } from "react";
-import { NavLink } from "react-router-dom";
+import { NavLink, useNavigate } from "react-router-dom";
 import { Home, Search, Library, Heart } from "lucide-react";
 import clsx from "clsx";
 import { usePlayerStore } from "../store/playerStore";
 import { useAuthStore } from "../store/authStore";
 import { useLibraryStore } from "../store/libraryStore";
+import { useSourceStore, type MusicSource } from "../store/sourceStore";
+import { useLocalLibraryStore } from "../store/localLibraryStore";
 import { CoverArt } from "./CoverArt";
 
 const navItems = [
   { to: "/", label: "Home", icon: Home, end: true },
   { to: "/search", label: "Search", icon: Search, end: false },
+];
+
+const sources: { id: MusicSource; label: string }[] = [
+  { id: "youtube", label: "YouTube" },
+  { id: "local", label: "Local" },
 ];
 
 const filters = [
@@ -22,13 +29,23 @@ type Filter = (typeof filters)[number]["id"];
 
 export function Sidebar() {
   const [filter, setFilter] = useState<Filter>("all");
+  const navigate = useNavigate();
   const likedCount = usePlayerStore((s) => Object.values(s.likedIds).filter(Boolean).length);
   const isSignedIn = useAuthStore((s) => s.state === "signed_in");
   const playlists = useLibraryStore((s) => s.playlists.data) ?? [];
   const albums = useLibraryStore((s) => s.albums.data) ?? [];
+  const activeSource = useSourceStore((s) => s.active);
+  const setActiveSource = useSourceStore((s) => s.setActive);
+  const localAlbums = useLocalLibraryStore((s) => s.albums);
 
-  const allCollections = isSignedIn ? [...playlists, ...albums] : [];
+  const isLocal = activeSource === "local";
+  const allCollections = isLocal ? localAlbums : isSignedIn ? [...playlists, ...albums] : [];
   const items = allCollections.filter((c) => filter === "all" || c.kind === filter);
+
+  function handleSourceChange(source: MusicSource) {
+    setActiveSource(source);
+    if (source === "local") navigate("/library");
+  }
 
   return (
     <aside className="flex h-full min-h-0 w-72 shrink-0 flex-col gap-2 bg-black px-2 py-2">
@@ -37,8 +54,25 @@ export function Sidebar() {
         <span className="text-lg font-bold tracking-tight">TuneBox</span>
       </div>
 
+      <div className="flex gap-2 px-3 pb-1">
+        {sources.map((s) => (
+          <button
+            key={s.id}
+            onClick={() => handleSourceChange(s.id)}
+            className={clsx(
+              "pill flex-1 px-3 py-1.5 text-xs font-semibold transition-colors",
+              activeSource === s.id ? "bg-fg text-black" : "bg-surface-2 text-fg hover:bg-surface-3",
+            )}
+          >
+            {s.label}
+          </button>
+        ))}
+      </div>
+
       <nav className="flex flex-col gap-1 rounded-lg bg-surface px-2 py-2">
-        {navItems.map(({ to, label, icon: Icon, end }) => (
+        {navItems
+          .filter((item) => !isLocal || item.to !== "/")
+          .map(({ to, label, icon: Icon, end }) => (
           <NavLink
             key={to}
             to={to}
@@ -98,7 +132,12 @@ export function Sidebar() {
         </NavLink>
 
         <div className="no-scrollbar mt-1 min-h-0 flex-1 overflow-y-auto px-2 pb-2">
-          {!isSignedIn && (
+          {isLocal && items.length === 0 && (
+            <p className="px-2 py-3 text-xs text-muted">
+              Pick a local music folder in Settings to see your albums here.
+            </p>
+          )}
+          {!isLocal && !isSignedIn && (
             <p className="px-2 py-3 text-xs text-muted">
               Connect your YouTube Music account to see your playlists and albums here.
             </p>

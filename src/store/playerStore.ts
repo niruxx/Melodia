@@ -1,4 +1,6 @@
 import { create } from "zustand";
+import { invoke } from "@tauri-apps/api/core";
+import { listen } from "@tauri-apps/api/event";
 import type { Track } from "../lib/mockData";
 import type { RemoteCommand, RemoteState } from "../lib/types";
 
@@ -15,6 +17,7 @@ type PlayerState = {
   isExpanded: boolean;
   isQueueOpen: boolean;
   likedIds: Record<string, boolean>;
+  playbackError: string | null;
 
   /** Set while this device is controlling another device's playback over the
    * network. When present, playback actions are sent over the wire instead
@@ -34,10 +37,25 @@ type PlayerState = {
   cycleRepeat: () => void;
   setExpanded: (value: boolean) => void;
   setQueueOpen: (value: boolean) => void;
-  tick: () => void;
   setRemoteSender: (fn: ((cmd: RemoteCommand) => void) | null) => void;
   applyRemoteState: (state: RemoteState) => void;
 };
+
+const LOCAL_ID_PREFIX = "local:";
+
+/** Starts real audio playback for a track on this device (a no-op on the
+ * device that's currently controlling another one — see each action's guard
+ * above this being called only from local branches). Routes to the local
+ * file-based engine for tracks from the Local source, YouTube stream
+ * resolution otherwise. */
+function playReal(track: Track, onError: (message: string) => void) {
+  if (track.id.startsWith(LOCAL_ID_PREFIX)) {
+    const path = track.id.slice(LOCAL_ID_PREFIX.length);
+    invoke("playback_play_local", { path }).catch((e) => onError(String(e)));
+  } else {
+    invoke("playback_play", { videoId: track.id }).catch((e) => onError(String(e)));
+  }
+}
 
 export const usePlayerStore = create<PlayerState>((set, get) => ({
   queue: [],
@@ -50,6 +68,7 @@ export const usePlayerStore = create<PlayerState>((set, get) => ({
   isExpanded: false,
   isQueueOpen: false,
   likedIds: {},
+  playbackError: null,
   remoteSend: null,
 
   currentTrack: () => {
@@ -60,6 +79,10 @@ export const usePlayerStore = create<PlayerState>((set, get) => ({
   playTrack: (track, context) => {
     const remoteSend = get().remoteSend;
     if (remoteSend) {
+      if (track.id.startsWith(LOCAL_ID_PREFIX)) {
+        set({ playbackError: "Can't cast a local file to another device." });
+        return;
+      }
       remoteSend({ cmd: "play_track", track, queue: context && context.length > 0 ? context : [track] });
       return;
     }
@@ -70,7 +93,9 @@ export const usePlayerStore = create<PlayerState>((set, get) => ({
       queueIndex: queueIndex >= 0 ? queueIndex : 0,
       isPlaying: true,
       progress: 0,
+      playbackError: null,
     });
+    playReal(track, (message) => set({ playbackError: message, isPlaying: false }));
   },
 
   togglePlay: () => {
@@ -80,7 +105,11 @@ export const usePlayerStore = create<PlayerState>((set, get) => ({
       return;
     }
     if (get().queue.length === 0) return;
-    set((state) => ({ isPlaying: !state.isPlaying }));
+    const nowPlaying = !get().isPlaying;
+    set({ isPlaying: nowPlaying });
+    invoke(nowPlaying ? "playback_resume" : "playback_pause").catch((e) =>
+      set({ playbackError: String(e) }),
+    );
   },
 
   next: () => {
@@ -93,6 +122,7 @@ export const usePlayerStore = create<PlayerState>((set, get) => ({
     if (queue.length === 0) return;
     if (repeat === "one") {
       set({ progress: 0, isPlaying: true });
+      invoke("playback_seek", { seconds: 0 }).catch((e) => set({ playbackError: String(e) }));
       return;
     }
     let nextIndex = shuffle
@@ -103,10 +133,12 @@ export const usePlayerStore = create<PlayerState>((set, get) => ({
         nextIndex = 0;
       } else {
         set({ isPlaying: false, progress: 0 });
+        invoke("playback_stop").catch(() => {});
         return;
       }
     }
-    set({ queueIndex: nextIndex, progress: 0, isPlaying: true });
+    set({ queueIndex: nextIndex, progress: 0, isPlaying: true, playbackError: null });
+    playReal(queue[nextIndex], (message) => set({ playbackError: message, isPlaying: false }));
   },
 
   prev: () => {
@@ -119,10 +151,12 @@ export const usePlayerStore = create<PlayerState>((set, get) => ({
     if (queue.length === 0) return;
     if (progress > 3) {
       set({ progress: 0 });
+      invoke("playback_seek", { seconds: 0 }).catch((e) => set({ playbackError: String(e) }));
       return;
     }
     const prevIndex = Math.max(0, queueIndex - 1);
-    set({ queueIndex: prevIndex, progress: 0, isPlaying: true });
+    set({ queueIndex: prevIndex, progress: 0, isPlaying: true, playbackError: null });
+    playReal(queue[prevIndex], (message) => set({ playbackError: message, isPlaying: false }));
   },
 
   jumpTo: (index) => {
@@ -133,7 +167,8 @@ export const usePlayerStore = create<PlayerState>((set, get) => ({
     }
     const { queue } = get();
     if (index < 0 || index >= queue.length) return;
-    set({ queueIndex: index, progress: 0, isPlaying: true });
+    set({ queueIndex: index, progress: 0, isPlaying: true, playbackError: null });
+    playReal(queue[index], (message) => set({ playbackError: message, isPlaying: false }));
   },
 
   seek: (seconds) => {
@@ -143,6 +178,7 @@ export const usePlayerStore = create<PlayerState>((set, get) => ({
       return;
     }
     set({ progress: seconds });
+    invoke("playback_seek", { seconds }).catch((e) => set({ playbackError: String(e) }));
   },
 
   setVolume: (volume) => {
@@ -151,7 +187,9 @@ export const usePlayerStore = create<PlayerState>((set, get) => ({
       remoteSend({ cmd: "set_volume", volume });
       return;
     }
-    set({ volume: Math.min(1, Math.max(0, volume)) });
+    const clamped = Math.min(1, Math.max(0, volume));
+    set({ volume: clamped });
+    invoke("playback_set_volume", { volume: clamped }).catch(() => {});
   },
 
   toggleLike: (id) =>
@@ -183,19 +221,6 @@ export const usePlayerStore = create<PlayerState>((set, get) => ({
   setExpanded: (value) => set({ isExpanded: value }),
   setQueueOpen: (value) => set({ isQueueOpen: value }),
 
-  tick: () => {
-    const state = get();
-    if (state.remoteSend) return; // progress is driven by incoming remote state instead
-    const track = state.queue[state.queueIndex];
-    if (!state.isPlaying || !track) return;
-    const nextProgress = state.progress + 0.5;
-    if (nextProgress >= track.duration) {
-      get().next();
-    } else {
-      set({ progress: nextProgress });
-    }
-  },
-
   setRemoteSender: (fn) => set({ remoteSend: fn }),
 
   applyRemoteState: (state) =>
@@ -210,4 +235,22 @@ export const usePlayerStore = create<PlayerState>((set, get) => ({
     }),
 }));
 
-setInterval(() => usePlayerStore.getState().tick(), 500);
+// Real playback position/end-of-track events from the Rust audio engine —
+// only meaningful on whichever device is actually driving local playback
+// (i.e. not currently controlling another device over the network).
+listen<number>("playback:position", (event) => {
+  if (usePlayerStore.getState().remoteSend) return;
+  // A position tick means the engine is actively playing — clear any error
+  // left behind by an earlier, since-superseded fetch that failed after this
+  // one had already started succeeding.
+  usePlayerStore.setState({ progress: event.payload, playbackError: null });
+});
+
+listen("playback:ended", () => {
+  if (usePlayerStore.getState().remoteSend) return;
+  usePlayerStore.getState().next();
+});
+
+listen<string>("playback:error", (event) => {
+  usePlayerStore.setState({ playbackError: event.payload });
+});

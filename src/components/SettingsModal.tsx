@@ -2,36 +2,48 @@ import { useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { X } from "lucide-react";
 import { useDiscordStore } from "../store/discordStore";
+import { EQ_BAND_FREQS_HZ, useAudioSettingsStore } from "../store/audioSettingsStore";
+import { useLocalLibraryStore } from "../store/localLibraryStore";
 
 export function SettingsModal() {
   const open = useDiscordStore((s) => s.isSettingsOpen);
   const onClose = useDiscordStore((s) => s.closeSettings);
   const enabled = useDiscordStore((s) => s.enabled);
-  const savedAppId = useDiscordStore((s) => s.appId);
   const connected = useDiscordStore((s) => s.connected);
   const error = useDiscordStore((s) => s.error);
   const enable = useDiscordStore((s) => s.enable);
   const disable = useDiscordStore((s) => s.disable);
 
-  const [appId, setAppId] = useState(savedAppId);
+  const fadeMs = useAudioSettingsStore((s) => s.fadeMs);
+  const setFadeMs = useAudioSettingsStore((s) => s.setFadeMs);
+  const eqBands = useAudioSettingsStore((s) => s.eqBands);
+  const setEqBand = useAudioSettingsStore((s) => s.setEqBand);
+  const resetEq = useAudioSettingsStore((s) => s.resetEq);
+
+  const localFolder = useLocalLibraryStore((s) => s.folder);
+  const localError = useLocalLibraryStore((s) => s.error);
+  const pickFolder = useLocalLibraryStore((s) => s.pickFolder);
+
   const [busy, setBusy] = useState(false);
-  const [localError, setLocalError] = useState<string | null>(null);
+  const [folderBusy, setFolderBusy] = useState(false);
+
+  async function handlePickFolder() {
+    setFolderBusy(true);
+    try {
+      await pickFolder();
+    } finally {
+      setFolderBusy(false);
+    }
+  }
 
   async function handleToggle() {
-    setLocalError(null);
     setBusy(true);
     try {
       if (enabled) {
         await disable();
       } else {
-        if (!appId.trim()) {
-          setLocalError("Enter a Discord Application ID first.");
-          return;
-        }
-        await enable(appId.trim());
+        await enable();
       }
-    } catch (e) {
-      setLocalError(String(e));
     } finally {
       setBusy(false);
     }
@@ -85,25 +97,84 @@ export function SettingsModal() {
                 </button>
               </div>
 
-              {!enabled && (
-                <label className="flex flex-col gap-1 text-sm">
-                  Discord Application ID
-                  <input
-                    value={appId}
-                    onChange={(e) => setAppId(e.target.value)}
-                    className="rounded-md bg-surface-3 px-3 py-2 text-sm text-fg outline-none focus:ring-1 focus:ring-accent"
-                    placeholder="123456789012345678"
-                  />
-                  <span className="text-xs text-muted">
-                    Create one free at discord.com/developers/applications, name it
-                    &ldquo;TuneBox&rdquo;, then paste its Application ID here.
-                  </span>
-                </label>
-              )}
+              {error && <p className="text-sm text-red-400">{error}</p>}
 
-              {(error || localError) && (
-                <p className="text-sm text-red-400">{error ?? localError}</p>
-              )}
+              <div className="mt-2 flex flex-col gap-1.5">
+                <div className="text-sm font-semibold">Local music folder</div>
+                <div className="text-xs text-muted">
+                  Play songs straight from a folder on this computer via the "Local" tab.
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="min-w-0 flex-1 truncate rounded-md bg-surface-3 px-3 py-2 text-xs text-muted">
+                    {localFolder ?? "No folder selected"}
+                  </span>
+                  <button
+                    onClick={handlePickFolder}
+                    disabled={folderBusy}
+                    className="shrink-0 rounded-full bg-surface-3 px-4 py-1.5 text-xs font-semibold text-fg transition-colors hover:bg-surface-3/70 disabled:opacity-50"
+                  >
+                    Choose folder…
+                  </button>
+                </div>
+                {localError && <p className="text-sm text-red-400">{localError}</p>}
+              </div>
+
+              <div className="mt-2 flex flex-col gap-1.5">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <div className="text-sm font-semibold">Fade in / out</div>
+                    <div className="text-xs text-muted">
+                      Smoothly ramp volume at the start of a track and on pause/stop.
+                    </div>
+                  </div>
+                  <span className="shrink-0 text-xs text-muted">
+                    {fadeMs === 0 ? "Off" : `${(fadeMs / 1000).toFixed(1)}s`}
+                  </span>
+                </div>
+                <input
+                  type="range"
+                  min={0}
+                  max={3000}
+                  step={100}
+                  value={fadeMs}
+                  onChange={(e) => setFadeMs(Number(e.target.value))}
+                  className="w-full accent-accent"
+                />
+              </div>
+
+              <div className="mt-2 flex flex-col gap-2">
+                <div className="flex items-center justify-between">
+                  <div className="text-sm font-semibold">Equalizer</div>
+                  <button onClick={resetEq} className="text-xs text-muted hover:text-fg">
+                    Reset
+                  </button>
+                </div>
+                <div className="flex items-center justify-between gap-1 rounded-lg bg-surface-3 px-2 py-3">
+                  {EQ_BAND_FREQS_HZ.map((freq, i) => (
+                    <div key={freq} className="flex flex-col items-center gap-1.5">
+                      <span className="w-7 text-center text-[10px] tabular-nums text-muted">
+                        {eqBands[i] > 0 ? `+${eqBands[i]}` : eqBands[i]}
+                      </span>
+                      <div className="flex h-24 w-7 items-center justify-center overflow-hidden">
+                        <input
+                          type="range"
+                          min={-12}
+                          max={12}
+                          step={1}
+                          value={eqBands[i]}
+                          onChange={(e) => setEqBand(i, Number(e.target.value))}
+                          className="accent-accent"
+                          style={{ width: 96, transform: "rotate(-90deg)" }}
+                          aria-label={`${freq} Hz gain`}
+                        />
+                      </div>
+                      <span className="text-[10px] text-muted">
+                        {freq >= 1000 ? `${freq / 1000}k` : freq}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </div>
             </div>
           </motion.div>
         </>

@@ -22,6 +22,9 @@ import { useLibraryStore } from "./store/libraryStore";
 import { useDiscordStore } from "./store/discordStore";
 import { usePlayerStore } from "./store/playerStore";
 import { useNetworkStore } from "./store/networkStore";
+import { useAudioSettingsStore } from "./store/audioSettingsStore";
+import { useSourceStore } from "./store/sourceStore";
+import { useLocalLibraryStore } from "./store/localLibraryStore";
 
 function App() {
   const authState = useAuthStore((s) => s.state);
@@ -32,6 +35,9 @@ function App() {
     useAuthStore.getState().init();
     useDiscordStore.getState().init();
     useNetworkStore.getState().init();
+    useAudioSettingsStore.getState().init();
+    useSourceStore.getState().init();
+    useLocalLibraryStore.getState().init();
   }, []);
 
   useEffect(() => {

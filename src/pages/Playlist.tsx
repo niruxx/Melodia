@@ -7,11 +7,14 @@ import { SignInPrompt } from "../components/SignInPrompt";
 import { usePlayerStore } from "../store/playerStore";
 import { useAuthStore } from "../store/authStore";
 import { useLibraryStore } from "../store/libraryStore";
+import { useSourceStore } from "../store/sourceStore";
+import { useLocalLibraryStore } from "../store/localLibraryStore";
 import type { Track } from "../lib/types";
 
 export function Playlist() {
   const { id } = useParams<{ id: string }>();
   const authState = useAuthStore((s) => s.state);
+  const isLocal = useSourceStore((s) => s.active === "local");
 
   // Subscribe to these slices so this page re-renders once library data arrives.
   useLibraryStore((s) => s.playlists.data);
@@ -22,14 +25,18 @@ export function Playlist() {
   const getPlaylistTracks = useLibraryStore((s) => s.getPlaylistTracks);
   const playTrack = usePlayerStore((s) => s.playTrack);
 
+  const localAlbums = useLocalLibraryStore((s) => s.albums);
+  const localTracks = useLocalLibraryStore((s) => s.tracks);
+
   const [tracks, setTracks] = useState<Track[] | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  const collection = id ? findCollection(id) : undefined;
+  const localCollection = isLocal ? localAlbums.find((c) => c.id === id) : undefined;
+  const collection = isLocal ? localCollection : id ? findCollection(id) : undefined;
 
   useEffect(() => {
-    if (!id) return;
+    if (!id || isLocal) return;
     let cancelled = false;
     setLoading(true);
     setError(null);
@@ -46,9 +53,17 @@ export function Playlist() {
     return () => {
       cancelled = true;
     };
-  }, [id, getPlaylistTracks]);
+  }, [id, isLocal, getPlaylistTracks]);
 
-  if (authState !== "signed_in") {
+  useEffect(() => {
+    if (!isLocal || !localCollection) return;
+    const byId = new Map(localTracks.map((t) => [t.id, t]));
+    setTracks(localCollection.trackIds.map((tid) => byId.get(tid)).filter((t) => t != null));
+    setLoading(false);
+    setError(null);
+  }, [isLocal, localCollection, localTracks]);
+
+  if (!isLocal && authState !== "signed_in") {
     return <SignInPrompt />;
   }
 

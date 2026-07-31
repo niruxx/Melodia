@@ -4,11 +4,15 @@ import { Loader2, Search as SearchIcon } from "lucide-react";
 import { TrackRow } from "../components/TrackRow";
 import { SignInPrompt } from "../components/SignInPrompt";
 import { useAuthStore } from "../store/authStore";
+import { useSourceStore } from "../store/sourceStore";
+import { useLocalLibraryStore } from "../store/localLibraryStore";
 import { searchTracks } from "../lib/ytmusic";
 import type { Track } from "../lib/types";
 
 export function Search() {
   const authState = useAuthStore((s) => s.state);
+  const isLocal = useSourceStore((s) => s.active === "local");
+  const localTracks = useLocalLibraryStore((s) => s.tracks);
   const [params] = useSearchParams();
   const query = (params.get("q") ?? "").trim();
 
@@ -17,7 +21,24 @@ export function Search() {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!query || authState !== "signed_in") {
+    if (!query) {
+      setResults([]);
+      return;
+    }
+    if (isLocal) {
+      const q = query.toLowerCase();
+      setResults(
+        localTracks.filter(
+          (t) =>
+            t.title.toLowerCase().includes(q) ||
+            t.artist.toLowerCase().includes(q) ||
+            t.album.toLowerCase().includes(q),
+        ),
+      );
+      setError(null);
+      return;
+    }
+    if (authState !== "signed_in") {
       setResults([]);
       return;
     }
@@ -37,9 +58,9 @@ export function Search() {
     return () => {
       cancelled = true;
     };
-  }, [query, authState]);
+  }, [query, authState, isLocal, localTracks]);
 
-  if (authState !== "signed_in") {
+  if (!isLocal && authState !== "signed_in") {
     return <SignInPrompt />;
   }
 

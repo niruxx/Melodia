@@ -16,6 +16,7 @@ import threading
 import time
 from pathlib import Path
 
+import yt_dlp
 from ytmusicapi import YTMusic
 from ytmusicapi.auth.oauth.credentials import OAuthCredentials
 
@@ -191,6 +192,26 @@ def cmd_get_lyrics(args):
     return {"lyrics": result.get("lyrics"), "source": result.get("source")}
 
 
+def cmd_get_stream_url(args):
+    video_id = args["videoId"]
+    ydl_opts = {
+        "format": "bestaudio[ext=m4a]/bestaudio",
+        "quiet": True,
+        "no_warnings": True,
+        "noplaylist": True,
+    }
+    with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+        info = ydl.extract_info(f"https://music.youtube.com/watch?v={video_id}", download=False)
+    return {
+        "url": info.get("url"),
+        "ext": info.get("ext"),
+        # YouTube's CDN stalls/throttles requests that don't look like a
+        # real browser fetching the watch page — these are yt-dlp's own
+        # recommended headers for downloading this specific stream URL.
+        "headers": info.get("http_headers") or {},
+    }
+
+
 COMMANDS = {
     "auth_status": cmd_auth_status,
     "set_credentials": cmd_set_credentials,
@@ -204,6 +225,7 @@ COMMANDS = {
     "get_playlist": cmd_get_playlist,
     "search": cmd_search,
     "get_lyrics": cmd_get_lyrics,
+    "get_stream_url": cmd_get_stream_url,
 }
 
 

@@ -1,33 +1,17 @@
 import { create } from "zustand";
 import { invoke } from "@tauri-apps/api/core";
+import { DISCORD_APP_ID } from "../lib/discordConfig";
 
-const STORAGE_KEY = "tunebox:discord";
-
-type StoredSettings = { enabled: boolean; appId: string };
-
-function loadSettings(): StoredSettings {
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    if (raw) return JSON.parse(raw) as StoredSettings;
-  } catch {
-    // ignore malformed storage
-  }
-  return { enabled: false, appId: "" };
-}
-
-function saveSettings(settings: StoredSettings) {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(settings));
-}
+const STORAGE_KEY = "tunebox:discord-enabled";
 
 type DiscordStore = {
   enabled: boolean;
-  appId: string;
   connected: boolean;
   error: string | null;
   isSettingsOpen: boolean;
 
   init: () => Promise<void>;
-  enable: (appId: string) => Promise<void>;
+  enable: () => Promise<void>;
   disable: () => Promise<void>;
   updatePresence: (title: string, artist: string, thumbnail?: string) => Promise<void>;
   openSettings: () => void;
@@ -36,7 +20,6 @@ type DiscordStore = {
 
 export const useDiscordStore = create<DiscordStore>((set, get) => ({
   enabled: false,
-  appId: "",
   connected: false,
   error: null,
   isSettingsOpen: false,
@@ -45,11 +28,11 @@ export const useDiscordStore = create<DiscordStore>((set, get) => ({
   closeSettings: () => set({ isSettingsOpen: false }),
 
   init: async () => {
-    const settings = loadSettings();
-    set({ enabled: settings.enabled, appId: settings.appId });
-    if (settings.enabled && settings.appId) {
+    const wasEnabled = localStorage.getItem(STORAGE_KEY) === "true";
+    set({ enabled: wasEnabled });
+    if (wasEnabled) {
       try {
-        await invoke("discord_connect", { appId: settings.appId });
+        await invoke("discord_connect", { appId: DISCORD_APP_ID });
         set({ connected: true, error: null });
       } catch (e) {
         set({ connected: false, error: String(e) });
@@ -57,16 +40,20 @@ export const useDiscordStore = create<DiscordStore>((set, get) => ({
     }
   },
 
-  enable: async (appId) => {
+  enable: async () => {
     set({ error: null });
-    await invoke("discord_connect", { appId });
-    saveSettings({ enabled: true, appId });
-    set({ enabled: true, appId, connected: true });
+    try {
+      await invoke("discord_connect", { appId: DISCORD_APP_ID });
+      localStorage.setItem(STORAGE_KEY, "true");
+      set({ enabled: true, connected: true });
+    } catch (e) {
+      set({ enabled: false, connected: false, error: String(e) });
+    }
   },
 
   disable: async () => {
     await invoke("discord_disconnect").catch(() => {});
-    saveSettings({ enabled: false, appId: get().appId });
+    localStorage.setItem(STORAGE_KEY, "false");
     set({ enabled: false, connected: false });
   },
 
