@@ -3,6 +3,7 @@ mod artwork;
 mod commands;
 mod discord;
 mod equalizer;
+mod google_login;
 mod local_library;
 mod network;
 mod playback;
@@ -69,6 +70,7 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             greet,
             commands::ytm_auth_status,
+            commands::ytm_set_browser_auth,
             commands::ytm_set_credentials,
             commands::ytm_start_oauth,
             commands::ytm_poll_oauth,
@@ -102,6 +104,8 @@ pub fn run() {
             local_library::local_set_folder,
             local_library::local_scan,
             artwork::artwork_palette,
+            google_login::google_login_start,
+            google_login::google_login_cancel,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

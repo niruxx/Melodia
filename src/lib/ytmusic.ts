@@ -4,10 +4,38 @@ import type { Collection, Track } from "./types";
 // ---- raw invoke wrappers -------------------------------------------------
 
 export type AuthStatus = "no_credentials" | "signed_out" | "signed_in";
+export type AuthMethod = "browser" | "oauth" | null;
 
-export async function authStatus(): Promise<AuthStatus> {
-  const res = await invoke<{ status: AuthStatus }>("ytm_auth_status");
-  return res.status;
+export async function authStatus(): Promise<{
+  status: AuthStatus;
+  method: AuthMethod;
+  oauthConfigured: boolean;
+}> {
+  const res = await invoke<{
+    status: AuthStatus;
+    method?: AuthMethod;
+    oauthConfigured?: boolean;
+  }>("ytm_auth_status");
+  return {
+    status: res.status,
+    method: res.method ?? null,
+    oauthConfigured: res.oauthConfigured ?? false,
+  };
+}
+
+/** Hands a captured Google session cookie to the sidecar, which validates it. */
+export async function setBrowserAuth(cookie: string): Promise<void> {
+  await invoke("ytm_set_browser_auth", { cookie });
+}
+
+/** Opens Google's sign-in window; resolves once the window is up, not signed in. */
+export async function startGoogleLogin(): Promise<void> {
+  await invoke("google_login_start");
+}
+
+/** Closes the Google sign-in window, if open. */
+export async function cancelGoogleLogin(): Promise<void> {
+  await invoke("google_login_cancel");
 }
 
 export async function setCredentials(clientId: string, clientSecret: string): Promise<void> {

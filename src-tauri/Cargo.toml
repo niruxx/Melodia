@@ -37,4 +37,5 @@ base64 = "0.22"
 image = { version = "0.25", default-features = false, features = ["jpeg", "png", "webp", "gif"] }
 rustfft = "6"
 tauri-plugin-global-shortcut = "2.3.2"
+url = "2.5.8"
 

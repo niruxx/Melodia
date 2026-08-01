@@ -4855,6 +4855,7 @@ dependencies = [
  "tauri-plugin-global-shortcut",
  "tauri-plugin-opener",
  "tokio",
+ "url",
  "walkdir",
 ]
 

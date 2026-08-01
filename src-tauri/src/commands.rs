@@ -12,6 +12,16 @@ pub async fn ytm_auth_status(sidecar: State<'_, Sidecar>) -> Result<Value, Strin
 }
 
 #[tauri::command]
+pub async fn ytm_set_browser_auth(
+    sidecar: State<'_, Sidecar>,
+    cookie: String,
+) -> Result<Value, String> {
+    sidecar
+        .call("set_browser_auth", serde_json::json!({ "cookie": cookie }))
+        .await
+}
+
+#[tauri::command]
 pub async fn ytm_set_credentials(
     sidecar: State<'_, Sidecar>,
     client_id: String,

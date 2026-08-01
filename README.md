@@ -6,6 +6,8 @@
 
 Built with 🦀 [Tauri](https://tauri.app), ⚛️ React + TypeScript, and 🎨 Tailwind CSS — inspired by Spotify's layout, styled as its own thing.
 
+`v0.2.0a-PRE` &nbsp;·&nbsp; shown in **Settings**, defined in [`src/lib/version.ts`](src/lib/version.ts)
+
 ![TuneBox screenshot](docs/screenshot.png)
 
 </div>
@@ -16,7 +18,7 @@ Built with 🦀 [Tauri](https://tauri.app), ⚛️ React + TypeScript, and 🎨 
 
 - 🖤 **Modern, Spotify-inspired UI** — dark, dense two-panel sidebar, card grids, a full-width Now Playing bar, and a fullscreen "now playing" view
 - 🔊 **Real audio playback** — actual songs stream and play, decoded natively in Rust, not simulated
-- 🔐 **Real YouTube Music sign-in** — Google OAuth device-code flow (no password entry, no browser redirect dance)
+- 🔐 **One-click Google sign-in** — sign in through Google's own page in an app window; no Google Cloud project, client ID, or secret needed. A device-code OAuth flow remains available as a fallback.
 - 📚 **Real library sync** — your actual playlists, albums, home feed, recently played, and search, pulled live from your account
 - 💿 **Local music folder** — a "Local" tab plays songs straight off your disk (title/artist/album/art read from file tags), alongside YouTube Music, switchable any time
 - 🎚️ **Fade in / out & 5-band equalizer** — smooth volume ramps on play/pause/stop, plus a graphic EQ (60Hz–12kHz) tunable per session
@@ -98,28 +100,35 @@ npm run tauri build
 
 ## 🔑 Connecting Your YouTube Music Account
 
-YouTube Music has no official public API, so TuneBox uses the same OAuth device-code flow YouTube's own TV apps use. Google requires every app to bring **its own OAuth client** — there's no shared/default one to piggyback on.
+### Sign in with Google (default)
+
+1. Click **Connect YouTube Music** on the Home screen (or the account icon in the top bar)
+2. Hit **Sign in with Google** — a window opens on Google's real sign-in page
+3. Log in as you normally would
+
+That's it. TuneBox detects the finished session, verifies it, and loads your playlists, library, recently played, and search. **No Google Cloud project, no client ID, no client secret.**
+
+Under the hood it captures your YouTube session cookie; `ytmusicapi` derives the required `SAPISIDHASH` authorization header from it on every request. The cookie is verified against your account before anything is saved, so a half-finished login can't leave the app in a broken "signed in" state. It's stored in the app's data directory and cleared on sign-out.
+
+> **Note:** cookie sessions expire eventually (typically weeks) and are invalidated by a password change, so you'll occasionally need to sign in again. TuneBox re-checks the session at startup and prompts you if it has lapsed.
 
 <details>
-<summary><strong>📖 One-time setup: create your free Google OAuth client (~2 minutes)</strong></summary>
+<summary><strong>🔁 Fallback: sign in with your own Google OAuth client</strong></summary>
 
 <br>
 
-1. Go to the [Google Cloud Console](https://console.cloud.google.com/) and create a new project (or reuse one)
-2. Under **APIs & Services → OAuth consent screen**, configure it (External + Testing mode is fine for personal use)
-3. Under **APIs & Services → Credentials**, click **Create Credentials → OAuth client ID**
-4. Choose application type **"TVs and Limited Input devices"**
-5. Copy the generated **Client ID** and **Client Secret**
+If the Google window doesn't work for you, click **"Having trouble? Use the OAuth client method instead"** in the sign-in dialog. This is the original device-code flow and needs a free OAuth client of your own:
+
+1. Go to the [Google Cloud Console](https://console.cloud.google.com/) and create a project (or reuse one)
+2. Under **APIs & Services → OAuth consent screen**, configure it (External + Testing is fine for personal use)
+3. Under **APIs & Services → Credentials**, choose **Create Credentials → OAuth client ID**
+4. Pick application type **"TVs and Limited Input devices"**
+5. Paste the **Client ID** and **Client Secret** into TuneBox, then hit **Get a code**
+6. Open the link shown, enter the code, and approve access
+
+OAuth sessions refresh silently, so this method needs re-authentication less often.
 
 </details>
-
-Then, in TuneBox:
-
-1. Click **Connect YouTube Music** on the Home screen (or the account icon in the top bar)
-2. Paste your **Client ID** and **Client Secret**, and hit **Save & Continue**
-3. Click **Sign in with Google** — you'll get a short code and a link
-4. Open the link, enter the code, and approve access
-5. TuneBox picks it up automatically and loads your real playlists, library, and recently played 🎉
 
 ---
 
@@ -181,16 +190,50 @@ Every end user then just sees the plain Enable toggle above — nobody else need
 
 ---
 
+## 🎨 Design System
+
+The UI is built from a small set of shared primitives so pages can't visually drift apart. Worth knowing before adding screens:
+
+**Tokens** (`src/index.css`) — colours are `@theme` custom properties (`bg-base`, `bg-surface`/`-2`/`-3`, `text-fg`, `text-muted`, `bg-accent`). Two of them, `--accent-dynamic-1/-2`, are registered with `@property` so they can *animate*; the theme store rewrites them per track from album-art colours, and the whole UI transitions to match.
+
+**Shared components** — reuse these rather than re-styling:
+
+| Component | Use for |
+|---|---|
+| `PlayControls` | The play + shuffle pair atop every collection page |
+| `TrackList` / `TrackRow` | Any list of songs (staggered entrance + right-click menu included) |
+| `Skeleton` & friends | Loading placeholders — never a bare spinner for content |
+| `Marquee` | Track titles that may overflow |
+| `PlayingBars` | The "this is playing" indicator |
+| `ContextMenu` / `toast` | Right-click menus and transient confirmations |
+
+**Conventions**
+
+- Range inputs use `.tb-range` (thumb reveals on hover). Add `.tb-range-always` when the thumb *is* the readout, like the EQ.
+- Detail pages (Playlist, Liked Songs, Recently Played) share one hero: large artwork tile, uppercase eyebrow, `text-3xl sm:text-4xl` title, count line. Index pages (Home, Library, Search) use a plain `text-2xl` heading.
+- Cards are `rounded-lg`; their skeletons must match, or content visibly shifts on load.
+- Interactions use Framer Motion `whileHover`/`whileTap`, not CSS `hover:scale-*`.
+- Empty states are left-aligned `text-muted` paragraphs, in line with the content above them.
+- Overlay stacking: drawer `40` → modals `50` → incoming request `60` → shortcuts `65` → command palette `68` → context menu `70`.
+- Every animation is covered by the global `prefers-reduced-motion` guard.
+
+---
+
 ## 📁 Project Structure
 
 ```
 TuneBox/
 ├── src/                    # React frontend
-│   ├── components/         # UI components (Sidebar, Card, NowPlayingBar, modals, ...)
+│   ├── components/         # UI components + shared primitives:
+│   │                        #   PlayControls, TrackList, Skeleton, Marquee,
+│   │                        #   PlayingBars, ContextMenu, Toaster, CommandPalette,
+│   │                        #   Visualizer, MiniPlayer, PageTransition
 │   ├── pages/               # Route pages (Home, Search, Library, Playlist, ...)
-│   ├── store/               # Zustand stores (player, auth, library, discord)
-│   ├── lib/                 # Types + the ytmusicapi/Tauri command wrappers
-│   └── hooks/
+│   ├── store/               # Zustand stores (player, auth, library, discord,
+│   │                        #   theme, source, localLibrary, audioSettings,
+│   │                        #   toast, contextMenu, ui, miniPlayer)
+│   ├── lib/                 # Types, formatters, fuzzy matcher, version constant
+│   └── hooks/               # useKeyboardShortcuts, useMediaKeys, useTrackContextMenu
 ├── src-tauri/              # Rust backend
 │   └── src/
 │       ├── lib.rs           # App entry point, command registration
@@ -202,6 +245,7 @@ TuneBox/
 │       ├── equalizer.rs     # 5-band graphic EQ (custom rodio Source wrapper)
 │       ├── analyzer.rs      # FFT spectrum tap feeding the visualizer
 │       ├── artwork.rs       # Album-art dominant-colour extraction
+│       ├── google_login.rs  # Google sign-in window + session cookie capture
 │       └── local_library.rs # Local folder scan + tag reading (lofty)
 └── sidecar/                # Python sidecar
     └── main.py               # stdin/stdout JSON bridge around ytmusicapi + yt-dlp
@@ -212,10 +256,10 @@ TuneBox/
 ## 🗺️ Roadmap / Known Limitations
 
 - 📦 **No packaged installers yet** — `npm run tauri build` produces a binary, but signed installers/auto-update aren't set up.
-- 🔑 **Bring-your-own OAuth client** — by design (see above), for reliability and to avoid shared-credential rate limits.
 - 🍎 **One titlebar style everywhere** — the custom titlebar uses the same right-aligned controls on Windows, macOS, and Linux rather than native macOS traffic lights.
 - 🔓 **LAN device control has no encryption** — beyond the on-device Accept/Decline prompt, there's no auth on the local control connection; fine for a trusted home network, not intended for untrusted networks.
 - ⏳ **Playback buffers the full track before playing** rather than true progressive streaming — simpler and more robust, at the cost of a short delay (typically a couple seconds) before audio starts. Stream resolution and downloading happen on a background thread, so rapid back-to-back skipping stays responsive, but stream URLs aren't cached, so replaying a track re-resolves and re-downloads it.
+- 🍪 **Google sign-in sessions expire** — the default cookie-based sign-in lasts weeks, not forever, and is invalidated by a password change; you'll re-sign-in occasionally. The OAuth fallback refreshes silently if that matters to you.
 - 📡 **Local tracks can't be cast to another device** — "Connect to a device" only works for YouTube tracks today, since the controlled device wouldn't have the same file on its own disk.
 
 ---

@@ -5,9 +5,15 @@ Protocol: one JSON object per line on stdin -> {"id": N, "cmd": "...", "args": {
 One JSON object per line on stdout -> {"id": N, "ok": true, "data": ...} or
 {"id": N, "ok": false, "error": "..."}
 
-Requires a Google OAuth client (client_id/client_secret) for "TVs and Limited
-Input devices", registered by the user in Google Cloud Console — ytmusicapi no
-longer bundles a shared default client.
+Two sign-in methods are supported, in priority order:
+
+1. Browser/cookie auth (primary) — the app opens Google's real sign-in page in
+   a window, then hands us the resulting session cookie. ytmusicapi derives the
+   SAPISIDHASH authorization header from that cookie on every request, so no
+   OAuth client, client ID, or secret is involved at all.
+2. OAuth device-code (fallback) — requires a Google OAuth client for "TVs and
+   Limited Input devices" registered by the user in Google Cloud Console;
+   ytmusicapi no longer bundles a shared default client.
 """
 
 import json
@@ -19,13 +25,60 @@ from pathlib import Path
 import yt_dlp
 from ytmusicapi import YTMusic
 from ytmusicapi.auth.oauth.credentials import OAuthCredentials
+from ytmusicapi.helpers import get_authorization, initialize_headers, sapisid_from_cookie
 
 DATA_DIR = Path(sys.argv[1]) if len(sys.argv) > 1 else Path(".")
 DATA_DIR.mkdir(parents=True, exist_ok=True)
 CONFIG_PATH = DATA_DIR / "ytmusic_config.json"
 TOKEN_PATH = DATA_DIR / "ytmusic_oauth.json"
+BROWSER_AUTH_PATH = DATA_DIR / "ytmusic_browser.json"
 
-state = {"yt": None, "credentials": None, "oauth_pending": None}
+state = {"yt": None, "credentials": None, "oauth_pending": None, "browser_checked": False}
+
+
+def build_browser_headers(cookie: str, auth_user: int = 0) -> dict:
+    """Assemble the header dict ytmusicapi's BROWSER auth mode expects.
+
+    `initialize_headers()` supplies the standard client headers *including*
+    `origin`, which ytmusicapi needs to compute the SAPISIDHASH. The
+    `authorization` value we set here is only a seed: ytmusicapi recomputes it
+    on every request, but it must be present and contain "SAPISIDHASH" or
+    `determine_auth_type()` misclassifies this as OAuth.
+    """
+    headers = dict(initialize_headers())
+    headers["cookie"] = cookie
+    headers["x-goog-authuser"] = str(auth_user)
+    # Raises KeyError when the cookie lacks __Secure-3PAPISID, which is exactly
+    # the case we want to reject before persisting anything.
+    sapisid = sapisid_from_cookie(cookie)
+    headers["authorization"] = get_authorization(sapisid + " " + headers["origin"])
+    return headers
+
+
+def try_load_browser_client():
+    """Load the saved cookie session, verifying it is still actually valid.
+
+    A stale cookie doesn't error on library calls — those just come back empty
+    — so without this check an expired session would look "signed in" while
+    showing an empty library. The verification result is cached per process so
+    only the first call pays for the round trip.
+    """
+    if state["yt"] is not None:
+        return state["yt"]
+    if not BROWSER_AUTH_PATH.exists() or state.get("browser_checked"):
+        return None
+
+    state["browser_checked"] = True
+    try:
+        headers = json.loads(BROWSER_AUTH_PATH.read_text(encoding="utf-8"))
+        yt = YTMusic(auth=headers)
+        yt.get_account_info()  # raises when the session is no longer valid
+        state["yt"] = yt
+    except Exception:
+        # Deliberately left on disk: a transient network failure shouldn't
+        # force a full re-login on the next launch.
+        state["yt"] = None
+    return state["yt"]
 
 
 def load_config():
@@ -55,18 +108,61 @@ def try_load_client():
 
 
 def require_client():
-    yt = state["yt"] or try_load_client()
+    # Browser cookie auth wins when present; OAuth is the fallback.
+    yt = state["yt"] or try_load_browser_client() or try_load_client()
     if yt is None:
         raise RuntimeError("not signed in")
     return yt
 
 
 def cmd_auth_status(_args):
+    if try_load_browser_client() is not None:
+        return {"status": "signed_in", "method": "browser"}
     if get_credentials() is None:
-        return {"status": "no_credentials"}
+        # No OAuth client configured — but browser sign-in needs no setup, so
+        # this is still an actionable "signed out", not a dead end.
+        return {"status": "signed_out", "method": None, "oauthConfigured": False}
     if try_load_client() is not None:
-        return {"status": "signed_in"}
-    return {"status": "signed_out"}
+        return {"status": "signed_in", "method": "oauth"}
+    return {"status": "signed_out", "method": None, "oauthConfigured": True}
+
+
+def cmd_set_browser_auth(args):
+    """Validate a Google session cookie, then persist it as the active auth."""
+    cookie = (args.get("cookie") or "").strip()
+    if not cookie:
+        raise RuntimeError("no cookie provided")
+
+    try:
+        headers = build_browser_headers(cookie, int(args.get("authUser", 0)))
+    except KeyError as e:
+        raise RuntimeError(
+            "That Google session is missing the __Secure-3PAPISID cookie. "
+            "Make sure you completed sign-in."
+        ) from e
+
+    # Prove the cookie actually works before saving it, so a half-finished
+    # login can't leave the app in a broken "signed in" state.
+    #
+    # get_account_info() is the check that actually distinguishes authenticated
+    # from not: library endpoints quietly return an empty list for a bad
+    # session, whereas this one fails to find the account header.
+    yt = YTMusic(auth=headers)
+    try:
+        account = yt.get_account_info()
+    except Exception as e:
+        raise RuntimeError(
+            "That Google session isn't signed in to YouTube Music. "
+            "Please complete the sign-in and try again."
+        ) from e
+
+    BROWSER_AUTH_PATH.write_text(json.dumps(headers), encoding="utf-8")
+    state["yt"] = yt
+    return {
+        "ok": True,
+        "method": "browser",
+        "accountName": (account or {}).get("accountName"),
+    }
 
 
 def cmd_set_credentials(args):
@@ -151,8 +247,12 @@ def cmd_poll_oauth(_args):
 def cmd_sign_out(_args):
     state["yt"] = None
     state["oauth_pending"] = None
-    if TOKEN_PATH.exists():
-        TOKEN_PATH.unlink()
+    state["browser_checked"] = False
+    # Clear both auth methods so signing out doesn't silently fall back to a
+    # stale session from the other one.
+    for path in (TOKEN_PATH, BROWSER_AUTH_PATH):
+        if path.exists():
+            path.unlink()
     return {"ok": True}
 
 
@@ -214,6 +314,7 @@ def cmd_get_stream_url(args):
 
 COMMANDS = {
     "auth_status": cmd_auth_status,
+    "set_browser_auth": cmd_set_browser_auth,
     "set_credentials": cmd_set_credentials,
     "start_oauth": cmd_start_oauth,
     "poll_oauth": cmd_poll_oauth,
