@@ -243,8 +243,9 @@ export function SignInModal() {
             )}
 
             {state === "checking" && (
-              <div className="flex items-center justify-center py-8">
+              <div className="flex flex-col items-center gap-4 py-8 text-center">
                 <Loader2 size={24} className="animate-spin text-accent" />
+                <p className="text-sm text-muted">Checking your YouTube Music session...</p>
               </div>
             )}
           </motion.div>

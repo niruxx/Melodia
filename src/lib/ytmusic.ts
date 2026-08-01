@@ -1,5 +1,5 @@
 import { invoke } from "@tauri-apps/api/core";
-import type { Collection, Track } from "./types";
+import type { Collection, PlaylistPrivacy, Track } from "./types";
 
 // ---- raw invoke wrappers -------------------------------------------------
 
@@ -143,6 +143,7 @@ export function mapTrack(raw: Record<string, unknown>): Track {
     album: albumName(raw),
     duration: parseDurationSeconds(raw),
     thumbnail: bestThumbnail(raw.thumbnails),
+    setVideoId: typeof raw.setVideoId === "string" ? raw.setVideoId : undefined,
   };
 }
 
@@ -233,10 +234,87 @@ export async function getHistory(): Promise<Track[]> {
   return raw.filter((r): r is Record<string, unknown> => Boolean(r)).map(mapTrack);
 }
 
-export async function getPlaylistTracks(playlistId: string): Promise<Track[]> {
+export type PlaylistDetail = {
+  id: string;
+  title: string;
+  description: string;
+  privacy: PlaylistPrivacy;
+  owned: boolean;
+  thumbnail?: string;
+  tracks: Track[];
+};
+
+function asPrivacy(raw: unknown): PlaylistPrivacy {
+  return raw === "PUBLIC" || raw === "UNLISTED" ? raw : "PRIVATE";
+}
+
+export async function getPlaylistDetail(playlistId: string): Promise<PlaylistDetail> {
   const raw = await rawGetPlaylist(playlistId);
-  const tracks = Array.isArray(raw.tracks) ? raw.tracks : [];
-  return tracks.filter((r): r is Record<string, unknown> => Boolean(r)).map(mapTrack);
+  const rawTracks = Array.isArray(raw.tracks) ? raw.tracks : [];
+  return {
+    id: (raw.id as string) ?? playlistId,
+    title: (raw.title as string) ?? "Untitled",
+    description: (raw.description as string) ?? "",
+    privacy: asPrivacy(raw.privacy),
+    owned: raw.owned === true,
+    thumbnail: bestThumbnail(raw.thumbnails),
+    tracks: rawTracks.filter((r): r is Record<string, unknown> => Boolean(r)).map(mapTrack),
+  };
+}
+
+// ---- playlist mutations --------------------------------------------------
+
+export async function createPlaylist(
+  title: string,
+  description = "",
+  privacy: PlaylistPrivacy = "PRIVATE",
+): Promise<string> {
+  const res = await invoke<{ playlistId: string }>("ytm_create_playlist", {
+    title,
+    description,
+    privacy,
+  });
+  return res.playlistId;
+}
+
+export async function editPlaylist(
+  playlistId: string,
+  changes: { title?: string; description?: string; privacy?: PlaylistPrivacy },
+): Promise<void> {
+  await invoke("ytm_edit_playlist", {
+    playlistId,
+    title: changes.title ?? null,
+    description: changes.description ?? null,
+    privacy: changes.privacy ?? null,
+  });
+}
+
+export async function deletePlaylist(playlistId: string): Promise<void> {
+  await invoke("ytm_delete_playlist", { playlistId });
+}
+
+export async function addPlaylistItems(
+  playlistId: string,
+  videoIds: string[],
+  allowDuplicates = false,
+): Promise<void> {
+  await invoke("ytm_add_playlist_items", { playlistId, videoIds, allowDuplicates });
+}
+
+export async function removePlaylistItems(
+  playlistId: string,
+  items: { videoId: string; setVideoId: string }[],
+): Promise<void> {
+  await invoke("ytm_remove_playlist_items", { playlistId, items });
+}
+
+/** Moves `setVideoId` before `beforeSetVideoId`, or to the end when it's null. */
+export async function movePlaylistItem(
+  playlistId: string,
+  setVideoId: string,
+  beforeSetVideoId: string | null,
+): Promise<void> {
+  await invoke("ytm_move_playlist_item", { playlistId, setVideoId, beforeSetVideoId });
 }
 
 export async function getLyrics(

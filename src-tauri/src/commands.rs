@@ -85,6 +85,113 @@ pub async fn ytm_get_playlist(
 }
 
 #[tauri::command]
+pub async fn ytm_create_playlist(
+    sidecar: State<'_, Sidecar>,
+    title: String,
+    description: Option<String>,
+    privacy: Option<String>,
+) -> Result<Value, String> {
+    sidecar
+        .call(
+            "create_playlist",
+            serde_json::json!({
+                "title": title,
+                "description": description,
+                "privacy": privacy,
+            }),
+        )
+        .await
+}
+
+#[tauri::command]
+pub async fn ytm_edit_playlist(
+    sidecar: State<'_, Sidecar>,
+    playlist_id: String,
+    title: Option<String>,
+    description: Option<String>,
+    privacy: Option<String>,
+) -> Result<Value, String> {
+    sidecar
+        .call(
+            "edit_playlist",
+            serde_json::json!({
+                "playlistId": playlist_id,
+                "title": title,
+                "description": description,
+                "privacy": privacy,
+            }),
+        )
+        .await
+}
+
+#[tauri::command]
+pub async fn ytm_delete_playlist(
+    sidecar: State<'_, Sidecar>,
+    playlist_id: String,
+) -> Result<Value, String> {
+    sidecar
+        .call(
+            "delete_playlist",
+            serde_json::json!({ "playlistId": playlist_id }),
+        )
+        .await
+}
+
+#[tauri::command]
+pub async fn ytm_add_playlist_items(
+    sidecar: State<'_, Sidecar>,
+    playlist_id: String,
+    video_ids: Vec<String>,
+    allow_duplicates: Option<bool>,
+) -> Result<Value, String> {
+    sidecar
+        .call(
+            "add_playlist_items",
+            serde_json::json!({
+                "playlistId": playlist_id,
+                "videoIds": video_ids,
+                "allowDuplicates": allow_duplicates.unwrap_or(false),
+            }),
+        )
+        .await
+}
+
+/// `items` are `{ videoId, setVideoId }` pairs, passed through to ytmusicapi
+/// unchanged — both keys are required for a removal to be accepted.
+#[tauri::command]
+pub async fn ytm_remove_playlist_items(
+    sidecar: State<'_, Sidecar>,
+    playlist_id: String,
+    items: Vec<Value>,
+) -> Result<Value, String> {
+    sidecar
+        .call(
+            "remove_playlist_items",
+            serde_json::json!({ "playlistId": playlist_id, "items": items }),
+        )
+        .await
+}
+
+#[tauri::command]
+pub async fn ytm_move_playlist_item(
+    sidecar: State<'_, Sidecar>,
+    playlist_id: String,
+    set_video_id: String,
+    before_set_video_id: Option<String>,
+) -> Result<Value, String> {
+    sidecar
+        .call(
+            "move_playlist_item",
+            serde_json::json!({
+                "playlistId": playlist_id,
+                "setVideoId": set_video_id,
+                "beforeSetVideoId": before_set_video_id,
+            }),
+        )
+        .await
+}
+
+#[tauri::command]
 pub async fn ytm_search(sidecar: State<'_, Sidecar>, query: String) -> Result<Value, String> {
     sidecar
         .call("search", serde_json::json!({ "query": query }))

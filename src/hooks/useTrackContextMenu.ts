@@ -1,10 +1,27 @@
 import type { MouseEvent } from "react";
 import { useNavigate } from "react-router-dom";
-import { Copy, Disc3, Heart, HeartOff, ListEnd, ListStart, Play } from "lucide-react";
+import {
+  Copy,
+  Disc3,
+  Heart,
+  HeartOff,
+  ListEnd,
+  ListPlus,
+  ListStart,
+  ListX,
+  Play,
+} from "lucide-react";
 import { usePlayerStore } from "../store/playerStore";
+import { useAuthStore } from "../store/authStore";
 import { useContextMenuStore, type MenuItem } from "../store/contextMenuStore";
+import { usePlaylistModalStore } from "../store/playlistModalStore";
 import { toast } from "../store/toastStore";
 import type { Track } from "../lib/types";
+
+export type TrackMenuOptions = {
+  /** Supplied by pages showing an editable playlist; adds the remove entry. */
+  onRemoveFromPlaylist?: (track: Track) => void;
+};
 
 /**
  * Returns an `onContextMenu` handler that opens the standard track menu.
@@ -15,12 +32,14 @@ export function useTrackContextMenu() {
   const openMenu = useContextMenuStore((s) => s.openMenu);
   const navigate = useNavigate();
 
-  return (event: MouseEvent, track: Track, tracks?: Track[]) => {
+  return (event: MouseEvent, track: Track, tracks?: Track[], options?: TrackMenuOptions) => {
     event.preventDefault();
     event.stopPropagation();
 
     const player = usePlayerStore.getState();
     const liked = !!player.likedIds[track.id];
+    const isLocal = track.id.startsWith("local:");
+    const isSignedIn = useAuthStore.getState().state === "signed_in";
 
     const items: MenuItem[] = [
       {
@@ -55,9 +74,29 @@ export function useTrackContextMenu() {
       },
     ];
 
+    // A local file has no videoId YouTube would accept, so it can't go into a
+    // YouTube Music playlist at all.
+    if (!isLocal && isSignedIn) {
+      items.push({
+        label: "Add to playlist",
+        icon: ListPlus,
+        onSelect: () => usePlaylistModalStore.getState().openAddTo([track]),
+      });
+    }
+
+    if (options?.onRemoveFromPlaylist) {
+      const remove = options.onRemoveFromPlaylist;
+      items.push({
+        label: "Remove from this playlist",
+        icon: ListX,
+        danger: true,
+        onSelect: () => remove(track),
+      });
+    }
+
     // Local tracks have no browsable album page, so only offer it for
     // library-backed tracks that actually name an album.
-    if (track.album && !track.id.startsWith("local:")) {
+    if (track.album && !isLocal) {
       items.push({
         label: "Go to album",
         icon: Disc3,

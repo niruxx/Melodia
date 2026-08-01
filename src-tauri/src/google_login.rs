@@ -8,8 +8,14 @@ const WINDOW_LABEL: &str = "google-login";
 
 /// Where we send the user to sign in. Landing back on music.youtube.com is what
 /// tells us the flow finished.
-const LOGIN_URL: &str =
-    "https://accounts.google.com/ServiceLogin?service=youtube&continue=https%3A%2F%2Fmusic.youtube.com%2F";
+///
+/// This deliberately targets the *account chooser* rather than `ServiceLogin`.
+/// The webview keeps its own cookie jar, so once any Google session exists there
+/// `ServiceLogin` redirects straight through to music.youtube.com — the window
+/// opens and closes in well under a second, which looks like the button did
+/// nothing and gives no way to pick a different account. The chooser always
+/// renders, so signing in stays visible and switching accounts is possible.
+const LOGIN_URL: &str = "https://accounts.google.com/AccountChooser?service=youtube&continue=https%3A%2F%2Fmusic.youtube.com%2F";
 
 /// Cookies are read for this origin — the same one ytmusicapi sends requests to.
 const COOKIE_URL: &str = "https://music.youtube.com";

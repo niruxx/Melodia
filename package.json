@@ -1,7 +1,7 @@
 {
   "name": "tunebox",
   "private": true,
-  "version": "0.3.0-PRE",
+  "version": "0.3.0",
   "type": "module",
   "scripts": {
     "dev": "vite",

@@ -11,6 +11,8 @@ import { QueueDrawer } from "./components/QueueDrawer";
 import { SignInModal } from "./components/SignInModal";
 import { SettingsModal } from "./components/SettingsModal";
 import { DeviceConnectModal } from "./components/DeviceConnectModal";
+import { PlaylistFormModal } from "./components/PlaylistFormModal";
+import { AddToPlaylistModal } from "./components/AddToPlaylistModal";
 import { IncomingControlRequestModal } from "./components/IncomingControlRequestModal";
 import { PageTransition } from "./components/PageTransition";
 import { ContextMenu } from "./components/ContextMenu";
@@ -143,6 +145,8 @@ function App() {
       <SignInModal />
       <SettingsModal />
       <DeviceConnectModal />
+      <PlaylistFormModal />
+      <AddToPlaylistModal />
       <IncomingControlRequestModal />
       <ContextMenu />
       <CommandPalette />

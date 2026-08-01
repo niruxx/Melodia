@@ -1,6 +1,6 @@
 [package]
 name = "tunebox"
-version = "0.3.0-PRE"
+version = "0.3.0"
 description = "A cross-platform YouTube Music client"
 authors = ["you"]
 edition = "2021"

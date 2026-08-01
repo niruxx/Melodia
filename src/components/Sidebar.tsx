@@ -1,12 +1,13 @@
 import { useState } from "react";
 import { NavLink, useNavigate } from "react-router-dom";
-import { Home, Search, Library, Heart } from "lucide-react";
+import { Home, Search, Library, Heart, Plus } from "lucide-react";
 import clsx from "clsx";
 import { usePlayerStore } from "../store/playerStore";
 import { useAuthStore } from "../store/authStore";
 import { useLibraryStore } from "../store/libraryStore";
 import { useSourceStore, type MusicSource } from "../store/sourceStore";
 import { useLocalLibraryStore } from "../store/localLibraryStore";
+import { usePlaylistModalStore } from "../store/playlistModalStore";
 import { CoverArt } from "./CoverArt";
 
 const navItems = [
@@ -37,6 +38,7 @@ export function Sidebar() {
   const activeSource = useSourceStore((s) => s.active);
   const setActiveSource = useSourceStore((s) => s.setActive);
   const localAlbums = useLocalLibraryStore((s) => s.albums);
+  const openCreatePlaylist = usePlaylistModalStore((s) => s.openCreate);
 
   const isLocal = activeSource === "local";
   const allCollections = isLocal ? localAlbums : isSignedIn ? [...playlists, ...albums] : [];
@@ -94,6 +96,18 @@ export function Sidebar() {
         <div className="flex items-center gap-2 px-4 pb-2 pt-3">
           <Library size={20} className="text-muted" />
           <span className="text-sm font-semibold text-fg">Your Library</span>
+          {/* Creating playlists goes through the signed-in YouTube account, so
+              it's hidden for local playback and while signed out. */}
+          {!isLocal && isSignedIn && (
+            <button
+              onClick={() => openCreatePlaylist()}
+              className="ml-auto rounded-full p-1 text-muted transition-colors hover:bg-surface-2 hover:text-fg"
+              title="Create playlist"
+              aria-label="Create playlist"
+            >
+              <Plus size={18} />
+            </button>
+          )}
         </div>
 
         <div className="flex gap-2 px-3 pb-2">

@@ -22,10 +22,30 @@ import threading
 import time
 from pathlib import Path
 
+import requests
 import yt_dlp
 from ytmusicapi import YTMusic
 from ytmusicapi.auth.oauth.credentials import OAuthCredentials
 from ytmusicapi.helpers import get_authorization, initialize_headers, sapisid_from_cookie
+
+# `main()` handles one command at a time, so a request that never returns
+# doesn't just fail its own command — it wedges every command queued behind it,
+# and the app sits on a spinner forever. ytmusicapi issues its requests without
+# a timeout, so we have to impose one.
+REQUEST_TIMEOUT_SECONDS = 20
+
+
+class TimeoutSession(requests.Session):
+    """A requests session that refuses to wait forever."""
+
+    def request(self, *args, **kwargs):
+        kwargs.setdefault("timeout", REQUEST_TIMEOUT_SECONDS)
+        return super().request(*args, **kwargs)
+
+
+def new_ytmusic(**kwargs) -> YTMusic:
+    """Builds a YTMusic client whose requests are guaranteed to time out."""
+    return YTMusic(requests_session=TimeoutSession(), **kwargs)
 
 DATA_DIR = Path(sys.argv[1]) if len(sys.argv) > 1 else Path(".")
 DATA_DIR.mkdir(parents=True, exist_ok=True)
@@ -71,7 +91,7 @@ def try_load_browser_client():
     state["browser_checked"] = True
     try:
         headers = json.loads(BROWSER_AUTH_PATH.read_text(encoding="utf-8"))
-        yt = YTMusic(auth=headers)
+        yt = new_ytmusic(auth=headers)
         yt.get_account_info()  # raises when the session is no longer valid
         state["yt"] = yt
     except Exception:
@@ -101,7 +121,7 @@ def try_load_client():
     creds = get_credentials()
     if creds and TOKEN_PATH.exists():
         try:
-            state["yt"] = YTMusic(auth=str(TOKEN_PATH), oauth_credentials=creds)
+            state["yt"] = new_ytmusic(auth=str(TOKEN_PATH), oauth_credentials=creds)
         except Exception:
             state["yt"] = None
     return state["yt"]
@@ -147,7 +167,7 @@ def cmd_set_browser_auth(args):
     # get_account_info() is the check that actually distinguishes authenticated
     # from not: library endpoints quietly return an empty list for a bad
     # session, whereas this one fails to find the account header.
-    yt = YTMusic(auth=headers)
+    yt = new_ytmusic(auth=headers)
     try:
         account = yt.get_account_info()
     except Exception as e:
@@ -213,7 +233,7 @@ def cmd_start_oauth(_args):
                 }
                 TOKEN_PATH.write_text(json.dumps(token_dict), encoding="utf-8")
                 try:
-                    state["yt"] = YTMusic(auth=str(TOKEN_PATH), oauth_credentials=creds)
+                    state["yt"] = new_ytmusic(auth=str(TOKEN_PATH), oauth_credentials=creds)
                     pending["status"] = "success"
                 except Exception as e:
                     pending["status"] = "error"
@@ -272,8 +292,184 @@ def cmd_get_history(_args):
     return require_client().get_history()
 
 
+def normalize_watch_tracks(raw_tracks):
+    """Aligns get_watch_playlist's track shape with the rest of the API.
+
+    Radio results carry `length` ("2:59") and `thumbnail`, where every other
+    endpoint uses `duration` and `thumbnails`. Translating here keeps a single
+    track mapper on the frontend.
+    """
+    tracks = []
+    for track in raw_tracks or []:
+        if not isinstance(track, dict):
+            continue
+        track = dict(track)
+        if not track.get("duration") and track.get("length"):
+            track["duration"] = track["length"]
+        if "thumbnails" not in track and isinstance(track.get("thumbnail"), list):
+            track["thumbnails"] = track["thumbnail"]
+        tracks.append(track)
+    return tracks
+
+
 def cmd_get_playlist(args):
-    return require_client().get_playlist(args["playlistId"], limit=(args or {}).get("limit", 100))
+    """Resolves anything the UI routes to a collection page.
+
+    Home shelves and the library mix several kinds of id together, and
+    `get_playlist` only understands real playlists — handed an album, an
+    artist, or an auto-generated radio mix it gets back a response with no
+    `contents` and raises. Each kind needs its own endpoint, so dispatch on the
+    id's shape.
+    """
+    raw_id = args["playlistId"]
+    limit = (args or {}).get("limit", 100)
+    yt = require_client()
+
+    # `VL` is ytmusicapi's browse prefix, not part of the id itself.
+    playlist_id = raw_id[2:] if raw_id.startswith("VL") else raw_id
+
+    # None of the three below can ever be edited by the user.
+    if playlist_id.startswith("MPREb_"):  # album browse id
+        album = yt.get_album(playlist_id)
+        # get_album's track entries carry no artwork of their own. The album's
+        # own audio playlist returns the same tracks fully populated, so prefer
+        # it and fall back to stamping the album's artwork on each track.
+        audio_playlist_id = album.get("audioPlaylistId")
+        if audio_playlist_id:
+            try:
+                listing = yt.get_playlist(audio_playlist_id, limit=limit)
+                return {**album, "owned": False, "tracks": listing.get("tracks") or []}
+            except Exception:
+                pass
+        art = album.get("thumbnails") or []
+        tracks = [
+            {**t, "thumbnails": t.get("thumbnails") or art}
+            for t in (album.get("tracks") or [])
+            if isinstance(t, dict)
+        ]
+        return {**album, "owned": False, "tracks": tracks}
+
+    if playlist_id.startswith("UC"):  # artist/channel id
+        artist = yt.get_artist(playlist_id)
+        songs = artist.get("songs") or {}
+        # The inline `results` are a 5-track preview with no durations. The
+        # browseId behind them is the artist's full songs playlist, which comes
+        # back complete — prefer it and keep the preview as a fallback.
+        tracks = songs.get("results") or []
+        if songs.get("browseId"):
+            try:
+                listing = yt.get_playlist(songs["browseId"], limit=limit)
+                tracks = listing.get("tracks") or tracks
+            except Exception:
+                pass
+        return {
+            "title": artist.get("name") or "",
+            "description": artist.get("description") or "",
+            "thumbnails": artist.get("thumbnails") or [],
+            "owned": False,
+            "tracks": tracks,
+        }
+
+    if playlist_id.startswith("RD"):  # auto-generated radio / mix
+        watch = yt.get_watch_playlist(playlistId=playlist_id, limit=limit)
+        return {
+            "title": "",  # radio mixes are unnamed; the card's title stands in
+            "description": "",
+            "owned": False,
+            "tracks": normalize_watch_tracks(watch.get("tracks")),
+        }
+
+    raw = yt.get_playlist(playlist_id, limit=limit)
+    if isinstance(raw, dict):
+        owned = raw.get("owned")
+        if not isinstance(owned, bool):
+            # Older ytmusicapi builds omit `owned`. YouTube only hands out
+            # setVideoId for playlists the account can actually edit, so its
+            # presence is an equivalent signal.
+            tracks = raw.get("tracks") or []
+            owned = any(isinstance(t, dict) and t.get("setVideoId") for t in tracks)
+        raw["owned"] = owned
+    return raw
+
+
+# ---- playlist management -------------------------------------------------
+#
+# All of these need only generic auth, so they work with the cookie sign-in.
+# Note that YouTube Music only permits edits on playlists the user owns; the
+# `owned` flag from get_playlist is what the UI gates its controls on.
+
+
+def cmd_create_playlist(args):
+    title = (args.get("title") or "").strip()
+    if not title:
+        raise RuntimeError("playlist title is required")
+    # ytmusicapi rejects these outright rather than escaping them.
+    if any(c in title for c in "<>"):
+        raise RuntimeError("playlist titles can't contain < or >")
+
+    result = require_client().create_playlist(
+        title=title,
+        description=args.get("description") or "",
+        privacy_status=args.get("privacy") or "PRIVATE",
+    )
+    # Returns the new id on success, or a full response dict on failure.
+    if not isinstance(result, str):
+        raise RuntimeError(f"couldn't create the playlist: {result}")
+    return {"playlistId": result}
+
+
+def cmd_edit_playlist(args):
+    title = args.get("title")
+    if title is not None:
+        title = title.strip()
+        if not title:
+            raise RuntimeError("playlist title is required")
+        if any(c in title for c in "<>"):
+            raise RuntimeError("playlist titles can't contain < or >")
+
+    result = require_client().edit_playlist(
+        playlistId=args["playlistId"],
+        title=title,
+        description=args.get("description"),
+        privacyStatus=args.get("privacy"),
+    )
+    return {"status": result if isinstance(result, str) else "OK"}
+
+
+def cmd_delete_playlist(args):
+    result = require_client().delete_playlist(args["playlistId"])
+    return {"status": result if isinstance(result, str) else "OK"}
+
+
+def cmd_add_playlist_items(args):
+    video_ids = args.get("videoIds") or []
+    if not video_ids:
+        raise RuntimeError("no songs to add")
+    result = require_client().add_playlist_items(
+        playlistId=args["playlistId"],
+        videoIds=video_ids,
+        duplicates=bool(args.get("allowDuplicates", False)),
+    )
+    return {"status": result if isinstance(result, str) else "OK"}
+
+
+def cmd_remove_playlist_items(args):
+    # Each item needs both videoId and setVideoId; setVideoId only exists on
+    # playlists the user owns, which is why removal is gated on `owned`.
+    items = args.get("items") or []
+    if not items:
+        raise RuntimeError("no songs to remove")
+    result = require_client().remove_playlist_items(args["playlistId"], items)
+    return {"status": result if isinstance(result, str) else "OK"}
+
+
+def cmd_move_playlist_item(args):
+    """Move one track before another, or to the end when `beforeSetVideoId` is null."""
+    set_video_id = args["setVideoId"]
+    before = args.get("beforeSetVideoId")
+    move = (set_video_id, before) if before else set_video_id
+    result = require_client().edit_playlist(playlistId=args["playlistId"], moveItem=move)
+    return {"status": result if isinstance(result, str) else "OK"}
 
 
 def cmd_search(args):
@@ -309,6 +505,9 @@ def cmd_get_stream_url(args):
         "quiet": True,
         "no_warnings": True,
         "noplaylist": True,
+        # Same reasoning as REQUEST_TIMEOUT_SECONDS: resolving a stream sits on
+        # the one command loop, so it must not be able to block indefinitely.
+        "socket_timeout": REQUEST_TIMEOUT_SECONDS,
     }
     with yt_dlp.YoutubeDL(ydl_opts) as ydl:
         info = ydl.extract_info(f"https://music.youtube.com/watch?v={video_id}", download=False)
@@ -334,6 +533,12 @@ COMMANDS = {
     "get_library_albums": cmd_get_library_albums,
     "get_history": cmd_get_history,
     "get_playlist": cmd_get_playlist,
+    "create_playlist": cmd_create_playlist,
+    "edit_playlist": cmd_edit_playlist,
+    "delete_playlist": cmd_delete_playlist,
+    "add_playlist_items": cmd_add_playlist_items,
+    "remove_playlist_items": cmd_remove_playlist_items,
+    "move_playlist_item": cmd_move_playlist_item,
     "search": cmd_search,
     "get_account_info": cmd_get_account_info,
     "get_lyrics": cmd_get_lyrics,
@@ -347,16 +552,22 @@ def main():
         if not line:
             continue
         req_id = None
+        cmd = None
         try:
             req = json.loads(line)
             req_id = req.get("id")
-            handler = COMMANDS.get(req.get("cmd"))
+            cmd = req.get("cmd")
+            handler = COMMANDS.get(cmd)
             if handler is None:
-                raise ValueError(f"unknown command: {req.get('cmd')}")
+                raise ValueError(f"unknown command: {cmd}")
             data = handler(req.get("args") or {})
             resp = {"id": req_id, "ok": True, "data": data}
         except Exception as e:
-            resp = {"id": req_id, "ok": False, "error": str(e)}
+            # Name the command in the message. Some failures surface as bare
+            # OS errors ("[Errno 22] Invalid argument") that are impossible to
+            # trace back to what the app was doing without this.
+            detail = str(e) or type(e).__name__
+            resp = {"id": req_id, "ok": False, "error": f"{cmd or 'request'}: {detail}"}
         print(json.dumps(resp), flush=True)
 
 

@@ -36,6 +36,17 @@ type AuthStore = {
 };
 
 let pollTimer: ReturnType<typeof setInterval> | null = null;
+let googleTimeout: ReturnType<typeof setTimeout> | null = null;
+
+/** How long to wait for the Google window before giving the user a way out. */
+const GOOGLE_LOGIN_TIMEOUT_MS = 3 * 60_000;
+
+function clearGoogleTimeout() {
+  if (googleTimeout) {
+    clearTimeout(googleTimeout);
+    googleTimeout = null;
+  }
+}
 
 function stopPolling() {
   if (pollTimer) {
@@ -69,6 +80,7 @@ export const useAuthStore = create<AuthStore>((set, get) => ({
     // The Rust login window reports back here. Registered once at init so a
     // completed sign-in is captured even if the modal has been closed.
     listen<string>("google-login:complete", async (event) => {
+      clearGoogleTimeout();
       try {
         await ytmusic.setBrowserAuth(event.payload);
         set({
@@ -84,6 +96,7 @@ export const useAuthStore = create<AuthStore>((set, get) => ({
     });
 
     listen("google-login:cancelled", () => {
+      clearGoogleTimeout();
       // Only downgrade if we were mid-flow; a cancel shouldn't clobber a
       // session established some other way.
       if (get().state === "google_pending") set({ state: "signed_out" });
@@ -96,7 +109,23 @@ export const useAuthStore = create<AuthStore>((set, get) => ({
       await ytmusic.startGoogleLogin();
     } catch (e) {
       set({ state: "signed_out", error: String(e) });
+      return;
     }
+
+    // Failsafe: nothing else can rescue this state. If the window is dismissed
+    // in a way that emits no event, or the post-login verification stalls (it
+    // makes a network call with no timeout of its own), the UI would otherwise
+    // sit on "Waiting for Google sign-in" forever with no explanation.
+    if (googleTimeout) clearTimeout(googleTimeout);
+    googleTimeout = setTimeout(() => {
+      googleTimeout = null;
+      if (get().state !== "google_pending") return;
+      void ytmusic.cancelGoogleLogin();
+      set({
+        state: "signed_out",
+        error: "Google sign-in timed out. Please try again.",
+      });
+    }, GOOGLE_LOGIN_TIMEOUT_MS);
   },
 
   saveCredentials: async (clientId, clientSecret) => {
@@ -141,6 +170,7 @@ export const useAuthStore = create<AuthStore>((set, get) => ({
 
   cancelSignIn: () => {
     stopPolling();
+    clearGoogleTimeout();
     // Also dismiss the Google window if that's the flow being cancelled, so
     // it can't linger after the app has moved on.
     if (get().state === "google_pending") void ytmusic.cancelGoogleLogin();

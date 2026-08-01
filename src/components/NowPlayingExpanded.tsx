@@ -94,8 +94,11 @@ export function NowPlayingExpanded() {
             <ChevronDown size={20} />
           </button>
 
-          <div className="flex max-h-full w-full max-w-5xl flex-col items-center gap-12 overflow-y-auto px-8 py-6 md:flex-row md:items-center md:justify-center">
-            <div className="flex shrink-0 flex-col items-center">
+          <div className="flex max-h-full w-full max-w-5xl flex-col items-center gap-12 overflow-y-auto overflow-x-hidden px-8 py-6 md:flex-row md:items-center md:justify-center">
+            {/* `min-w-0` + a capped width stop a long track title from stretching
+                this column, which otherwise squeezes the lyrics panel and forces
+                the whole overlay to scroll sideways. */}
+            <div className="flex w-full min-w-0 max-w-md shrink-0 flex-col items-center">
               {/* A shared-element morph from the now-playing bar was tried here
                   and removed: the bar stays mounted behind this overlay, so two
                   live elements claimed the same layoutId and Framer Motion's
@@ -114,10 +117,12 @@ export function NowPlayingExpanded() {
                 />
               </motion.div>
 
-              <div className="mt-8 flex items-center gap-3">
-                <div className="text-center">
-                  <div className="text-2xl font-semibold tracking-tight">{track.title}</div>
-                  <div className="mt-1 text-muted">{track.artist}</div>
+              <div className="mt-8 flex w-full min-w-0 items-center justify-center gap-3">
+                <div className="min-w-0 text-center">
+                  <div className="line-clamp-2 break-words text-2xl font-semibold tracking-tight">
+                    {track.title}
+                  </div>
+                  <div className="mt-1 truncate text-muted">{track.artist}</div>
                 </div>
                 <button
                   onClick={() => toggleLike(track.id)}
@@ -186,7 +191,7 @@ export function NowPlayingExpanded() {
               </div>
             </div>
 
-            <div className="flex h-[60vh] w-full max-w-sm flex-col rounded-xl bg-black/30 p-6 backdrop-blur md:h-[70vh]">
+            <div className="flex h-[60vh] w-full min-w-[16rem] max-w-sm shrink-0 flex-col rounded-xl bg-black/30 p-6 backdrop-blur md:h-[70vh]">
               <h3 className="mb-4 shrink-0 text-xs font-semibold uppercase tracking-wider text-muted">
                 Lyrics
               </h3>

@@ -1,5 +1,5 @@
-import { motion } from "framer-motion";
-import { Heart, Pause, Play } from "lucide-react";
+import { Reorder, motion, useDragControls } from "framer-motion";
+import { GripVertical, Heart, Pause, Play } from "lucide-react";
 import clsx from "clsx";
 import { CoverArt } from "./CoverArt";
 import { PlayingBars } from "./PlayingBars";
@@ -13,6 +13,10 @@ type TrackRowProps = {
   index: number;
   tracks: Track[];
   showAlbum?: boolean;
+  onRemove?: (track: Track) => void;
+  /** Turns the row into a drag-reorderable item. Requires a Reorder.Group parent. */
+  reorderable?: boolean;
+  onDragEnd?: () => void;
 };
 
 /** Shared by list pages so rows fade/rise in sequence rather than all at once. */
@@ -26,7 +30,22 @@ export const listItemVariants = {
   show: { opacity: 1, y: 0, transition: { duration: 0.22, ease: "easeOut" as const } },
 };
 
-export function TrackRow({ track, index, tracks, showAlbum = true }: TrackRowProps) {
+/** Reorder.Item drives `y` itself for the drag axis, so reorderable rows fade
+ * in without the rise rather than fighting it for the same transform. */
+const reorderItemVariants = {
+  hidden: { opacity: 0 },
+  show: { opacity: 1, transition: { duration: 0.22, ease: "easeOut" as const } },
+};
+
+export function TrackRow({
+  track,
+  index,
+  tracks,
+  showAlbum = true,
+  onRemove,
+  reorderable = false,
+  onDragEnd,
+}: TrackRowProps) {
   const current = usePlayerStore((s) => s.currentTrack());
   const isPlaying = usePlayerStore((s) => s.isPlaying);
   const playTrack = usePlayerStore((s) => s.playTrack);
@@ -34,6 +53,7 @@ export function TrackRow({ track, index, tracks, showAlbum = true }: TrackRowPro
   const liked = usePlayerStore((s) => s.likedIds[track.id]);
   const toggleLike = usePlayerStore((s) => s.toggleLike);
   const openTrackMenu = useTrackContextMenu();
+  const dragControls = useDragControls();
 
   const isCurrent = current?.id === track.id;
 
@@ -45,16 +65,19 @@ export function TrackRow({ track, index, tracks, showAlbum = true }: TrackRowPro
     }
   }
 
-  return (
-    <motion.div
-      variants={listItemVariants}
-      onClick={handleRowClick}
-      onContextMenu={(e) => openTrackMenu(e, track, tracks)}
-      className={clsx(
-        "group grid cursor-pointer grid-cols-[2rem_1fr_auto] items-center gap-4 rounded-lg px-3 py-2 transition-colors sm:grid-cols-[2rem_1fr_10rem_auto]",
-        isCurrent ? "bg-surface-2" : "hover:bg-surface-2",
-      )}
-    >
+  const rowProps = {
+    variants: reorderable ? reorderItemVariants : listItemVariants,
+    onClick: handleRowClick,
+    onContextMenu: (e: React.MouseEvent) =>
+      openTrackMenu(e, track, tracks, { onRemoveFromPlaylist: onRemove }),
+    className: clsx(
+      "group grid cursor-pointer grid-cols-[2rem_1fr_auto] items-center gap-4 rounded-lg px-3 py-2 transition-colors sm:grid-cols-[2rem_1fr_10rem_auto]",
+      isCurrent ? "bg-surface-2" : "hover:bg-surface-2",
+    ),
+  };
+
+  const content = (
+    <>
       <div className="flex w-8 items-center justify-center text-sm text-muted">
         <span className="group-hover:hidden">
           {isCurrent ? (
@@ -98,7 +121,39 @@ export function TrackRow({ track, index, tracks, showAlbum = true }: TrackRowPro
         <span className="w-10 text-right text-sm tabular-nums text-muted">
           {formatDuration(track.duration)}
         </span>
+        {reorderable && (
+          // Dragging is handle-only: a whole-row drag listener would swallow
+          // the click-to-play the rest of the app relies on.
+          <button
+            onPointerDown={(e) => {
+              e.stopPropagation();
+              dragControls.start(e);
+            }}
+            onClick={(e) => e.stopPropagation()}
+            className="cursor-grab touch-none text-muted opacity-0 transition-opacity focus-visible:opacity-100 active:cursor-grabbing group-hover:opacity-100"
+            aria-label={`Reorder ${track.title}`}
+          >
+            <GripVertical size={16} />
+          </button>
+        )}
       </div>
-    </motion.div>
+    </>
   );
+
+  if (reorderable) {
+    return (
+      <Reorder.Item
+        as="div"
+        value={track}
+        dragListener={false}
+        dragControls={dragControls}
+        onDragEnd={onDragEnd}
+        {...rowProps}
+      >
+        {content}
+      </Reorder.Item>
+    );
+  }
+
+  return <motion.div {...rowProps}>{content}</motion.div>;
 }

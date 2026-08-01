@@ -61,7 +61,8 @@ pub fn run() {
         .setup(|app| {
             register_media_keys(app.handle());
             let data_dir = app.path().app_data_dir()?;
-            let sidecar = Sidecar::spawn(data_dir).map_err(std::io::Error::other)?;
+            let resource_dir = app.path().resource_dir().ok();
+            let sidecar = Sidecar::spawn(data_dir, resource_dir).map_err(std::io::Error::other)?;
             app.manage(sidecar);
             app.manage(Discord::new());
             app.manage(Arc::new(NetworkState::new()));
@@ -102,6 +103,12 @@ pub fn run() {
             commands::ytm_get_library_albums,
             commands::ytm_get_history,
             commands::ytm_get_playlist,
+            commands::ytm_create_playlist,
+            commands::ytm_edit_playlist,
+            commands::ytm_delete_playlist,
+            commands::ytm_add_playlist_items,
+            commands::ytm_remove_playlist_items,
+            commands::ytm_move_playlist_item,
             commands::ytm_search,
             commands::ytm_get_account_info,
             commands::ytm_get_lyrics,

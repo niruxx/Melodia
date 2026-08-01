@@ -11,19 +11,19 @@ export function LikedSongs() {
   const likedIds = usePlayerStore((s) => s.likedIds);
   const playTrack = usePlayerStore((s) => s.playTrack);
   const trackCache = useLibraryStore((s) => s.trackCache);
-  const playlistTracksCache = useLibraryStore((s) => s.playlistTracksCache);
+  const playlistCache = useLibraryStore((s) => s.playlistCache);
   const history = useLibraryStore((s) => s.history.data);
 
   const tracks = useMemo(() => {
     const known = new Map<string, Track>();
     for (const t of allTracks) known.set(t.id, t);
     for (const t of Object.values(trackCache)) known.set(t.id, t);
-    for (const list of Object.values(playlistTracksCache)) {
-      for (const t of list) known.set(t.id, t);
+    for (const detail of Object.values(playlistCache)) {
+      for (const t of detail.tracks) known.set(t.id, t);
     }
     for (const t of history ?? []) known.set(t.id, t);
     return Array.from(known.values()).filter((t) => likedIds[t.id]);
-  }, [likedIds, trackCache, playlistTracksCache, history]);
+  }, [likedIds, trackCache, playlistCache, history]);
 
   function handlePlay() {
     if (tracks.length > 0) playTrack(tracks[0], tracks);

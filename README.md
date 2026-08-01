@@ -6,11 +6,28 @@
 
 Built with 🦀 [Tauri](https://tauri.app), ⚛️ React + TypeScript, and 🎨 Tailwind CSS — inspired by Spotify's layout, styled as its own thing.
 
-`v0.3.0-PRE` &nbsp;·&nbsp; shown in **Settings**, defined in [`src/lib/version.ts`](src/lib/version.ts)
+`v0.3.0` &nbsp;·&nbsp; shown in **Settings**, defined in [`src/lib/version.ts`](src/lib/version.ts)
 
-![TuneBox screenshot](docs/screenshot.png)
+![TuneBox — Home](docs/screenshot.png)
 
 </div>
+
+<table>
+<tr>
+<td width="50%"><img src="docs/now-playing.png" alt="Fullscreen player with the spectrum visualizer and adaptive album-art theming" /></td>
+<td width="50%"><img src="docs/command-palette.png" alt="Command palette" /></td>
+</tr>
+<tr>
+<td align="center"><em>Fullscreen player — live spectrum visualizer, tinted by the album art</em></td>
+<td align="center"><em>Command palette (<kbd>Ctrl</kbd>+<kbd>K</kbd>)</em></td>
+</tr>
+<tr>
+<td colspan="2"><img src="docs/settings.png" alt="Settings panel" /></td>
+</tr>
+<tr>
+<td colspan="2" align="center"><em>Settings — background playback, local folder, fades, sleep timer, and the 5-band EQ</em></td>
+</tr>
+</table>
 
 ---
 
@@ -65,12 +82,72 @@ Built with 🦀 [Tauri](https://tauri.app), ⚛️ React + TypeScript, and 🎨 
 
 ## 📋 Prerequisites
 
-You'll need all of the following installed to run TuneBox from source:
+Common to every platform:
 
 - 🟢 **[Node.js](https://nodejs.org/)** (v18+) and npm
 - 🦀 **[Rust](https://www.rust-lang.org/tools/install)** (via `rustup`)
-- 🪟 **Windows only:** [Microsoft C++ Build Tools](https://visualstudio.microsoft.com/visual-cpp-build-tools/) (the "Desktop development with C++" workload) — required for Rust to link on Windows
 - 🐍 **[Python 3](https://www.python.org/)** + pip — powers the YouTube Music sidecar
+
+Then the platform-specific build dependencies:
+
+<details open>
+<summary><strong>🪟 Windows</strong></summary>
+
+<br>
+
+Install [Microsoft C++ Build Tools](https://visualstudio.microsoft.com/visual-cpp-build-tools/) with the **"Desktop development with C++"** workload — Rust needs it to link. WebView2 ships with Windows 10/11; on older builds install the [Evergreen runtime](https://developer.microsoft.com/microsoft-edge/webview2/).
+
+</details>
+
+<details>
+<summary><strong>🍎 macOS</strong></summary>
+
+<br>
+
+```bash
+xcode-select --install          # Apple's command line tools
+brew install python            # if you don't already have python3
+```
+
+Everything else TuneBox needs is provided by the system: WKWebView for the UI and CoreAudio for playback.
+
+</details>
+
+<details>
+<summary><strong>🐧 Linux</strong></summary>
+
+<br>
+
+**Debian / Ubuntu:**
+
+```bash
+sudo apt update
+sudo apt install -y   build-essential curl wget file   libwebkit2gtk-4.1-dev librsvg2-dev libssl-dev   libayatana-appindicator3-dev libxdo-dev   libasound2-dev   python3 python3-pip
+```
+
+**Fedora:**
+
+```bash
+sudo dnf install -y   @development-tools webkit2gtk4.1-devel librsvg2-devel openssl-devel   libappindicator-gtk3-devel libxdo-devel   alsa-lib-devel   python3 python3-pip
+```
+
+**Arch:**
+
+```bash
+sudo pacman -S --needed   base-devel webkit2gtk-4.1 librsvg openssl   libayatana-appindicator xdotool   alsa-lib   python python-pip
+```
+
+Why each of the less obvious ones is needed:
+
+| Package | Needed for |
+|---|---|
+| `libwebkit2gtk-4.1` | the webview Tauri renders the UI in |
+| `libasound2` / `alsa-lib` | audio output — `rodio`/`cpal` build against ALSA |
+| `libayatana-appindicator3` | the system tray icon used by background playback |
+| `libxdo` / `xdotool` | tray and global-shortcut support on X11 |
+| `libssl` / `openssl` | HTTPS, via `reqwest`'s native-TLS backend |
+
+</details>
 
 ---
 
@@ -91,11 +168,21 @@ pip install -r sidecar/requirements.txt
 npm run tauri dev
 ```
 
-To build a production binary:
+To build a production binary and installers:
 
 ```bash
 npm run tauri build
 ```
+
+Tauri only builds for the machine it runs on — there's no cross-compiling here, so build each platform on that platform. Output lands in `src-tauri/target/release/bundle/`:
+
+| Platform | Artifacts |
+|---|---|
+| 🪟 Windows | `msi/*.msi`, `nsis/*-setup.exe` |
+| 🍎 macOS | `dmg/*.dmg`, `macos/*.app` |
+| 🐧 Linux | `deb/*.deb`, `rpm/*.rpm`, `appimage/*.AppImage` |
+
+> **Python is a runtime requirement, not just a build one.** The bundle ships `sidecar/main.py` as a resource, but the machine running TuneBox still needs Python 3 on `PATH` plus the packages from `sidecar/requirements.txt`. TuneBox looks for `python3` first and falls back to `python` (and `py` on Windows).
 
 ---
 
@@ -273,11 +360,12 @@ TuneBox/
 
 ## 🗺️ Roadmap / Known Limitations
 
-- 📦 **No packaged installers yet** — `npm run tauri build` produces a binary, but signed installers/auto-update aren't set up.
+- 📦 **Installers are unsigned** — `npm run tauri build` does produce a Windows `.msi` and an NSIS `.exe` installer, but they aren't code-signed and there's no auto-update channel, so Windows SmartScreen will warn on first run.
 - 🍎 **One titlebar style everywhere** — the custom titlebar uses the same right-aligned controls on Windows, macOS, and Linux rather than native macOS traffic lights.
 - 🔓 **LAN device control has no encryption** — beyond the on-device Accept/Decline prompt, there's no auth on the local control connection; fine for a trusted home network, not intended for untrusted networks.
 - ⏳ **Playback buffers the full track before playing** rather than true progressive streaming — simpler and more robust, at the cost of a short delay (~1.5s measured) before audio starts. The download uses an explicit HTTP byte range: YouTube throttles plain full-file GETs on its media CDN to a trickle (~32 KiB/s measured, versus several MiB/s for the identical ranged request), so a range request is what makes this practical at all. Stream resolution and downloading happen on a background thread, so rapid back-to-back skipping stays responsive, but stream URLs aren't cached, so replaying a track re-resolves and re-downloads it.
 - 🍪 **Google sign-in sessions expire** — the default cookie-based sign-in lasts weeks, not forever, and is invalidated by a password change; you'll re-sign-in occasionally. The OAuth fallback refreshes silently if that matters to you.
+- 🧪 **Only Windows is build-tested** — the code contains no platform-specific branches and every dependency is cross-platform, but macOS and Linux builds haven't been run yet. Two known rough edges if you try: on macOS, hiding to the tray leaves the app in the Dock (clicking the Dock icon won't restore the window — use the tray), and on Linux the tray and media keys rely on X11, so Wayland sessions may not pick them up.
 - 📡 **Local tracks can't be cast to another device** — "Connect to a device" only works for YouTube tracks today, since the controlled device wouldn't have the same file on its own disk.
 
 ---

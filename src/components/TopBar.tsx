@@ -1,4 +1,5 @@
 import { ChevronLeft, ChevronRight, Search, Settings, X } from "lucide-react";
+import { AnimatePresence, motion } from "framer-motion";
 import { useLocation, useNavigate } from "react-router-dom";
 import { useEffect, useRef, useState } from "react";
 import { useAuthStore } from "../store/authStore";
@@ -11,6 +12,7 @@ export function TopBar() {
   const navigate = useNavigate();
   const location = useLocation();
   const [query, setQuery] = useState("");
+  const [confirmingSignOut, setConfirmingSignOut] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
   const authState = useAuthStore((s) => s.state);
   const openModal = useAuthStore((s) => s.openModal);
@@ -124,7 +126,7 @@ export function TopBar() {
           <Settings size={18} />
         </button>
         <button
-          onClick={() => (isSignedIn ? doSignOut() : openModal())}
+          onClick={() => (isSignedIn ? setConfirmingSignOut(true) : openModal())}
           title={isSignedIn ? "Signed in — click to sign out" : "Connect YouTube Music"}
           className={
             "flex h-8 w-8 items-center justify-center rounded-full text-xs font-semibold transition-transform hover:scale-105 " +
@@ -134,6 +136,51 @@ export function TopBar() {
           Y
         </button>
       </div>
+
+      {/* Signing out deletes the stored Google session and needs a full
+          re-login to undo, so it doesn't happen on a single stray click. */}
+      <AnimatePresence>
+        {confirmingSignOut && (
+          <>
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setConfirmingSignOut(false)}
+              className="fixed inset-0 z-50 bg-black/60"
+            />
+            <motion.div
+              initial={{ opacity: 0, scale: 0.96, y: 12 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.96, y: 12 }}
+              transition={{ duration: 0.18 }}
+              className="fixed left-1/2 top-1/2 z-50 w-full max-w-sm -translate-x-1/2 -translate-y-1/2 rounded-xl bg-surface-2 p-6 shadow-2xl"
+            >
+              <h2 className="text-lg font-bold">Sign out of YouTube Music?</h2>
+              <p className="mt-2 text-sm text-muted">
+                You&rsquo;ll need to sign in with Google again to get your library back.
+              </p>
+              <div className="mt-6 flex justify-end gap-2">
+                <button
+                  onClick={() => setConfirmingSignOut(false)}
+                  className="rounded-full px-4 py-2 text-sm font-semibold text-muted hover:text-fg"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={() => {
+                    setConfirmingSignOut(false);
+                    void doSignOut();
+                  }}
+                  className="rounded-full bg-red-500 px-5 py-2 text-sm font-semibold text-white transition-transform hover:scale-105"
+                >
+                  Sign out
+                </button>
+              </div>
+            </motion.div>
+          </>
+        )}
+      </AnimatePresence>
     </header>
   );
 }

@@ -5,7 +5,12 @@ export type Track = {
   album: string;
   duration: number;
   thumbnail?: string;
+  /** Per-playlist handle YouTube requires to remove or reorder this entry.
+   * Only present on playlists the signed-in account owns. */
+  setVideoId?: string;
 };
+
+export type PlaylistPrivacy = "PUBLIC" | "UNLISTED" | "PRIVATE";
 
 export type Collection = {
   id: string;
@@ -14,6 +19,10 @@ export type Collection = {
   kind: "playlist" | "album";
   trackIds: string[];
   thumbnail?: string;
+  /** True only for playlists the signed-in account can edit. */
+  owned?: boolean;
+  description?: string;
+  privacy?: PlaylistPrivacy;
 };
 
 /** Commands a controller sends to the device it's remotely controlling. */
