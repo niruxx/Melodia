@@ -20,6 +20,14 @@ Built with 🦀 [Tauri](https://tauri.app), ⚛️ React + TypeScript, and 🎨 
 - 📚 **Real library sync** — your actual playlists, albums, home feed, recently played, and search, pulled live from your account
 - 💿 **Local music folder** — a "Local" tab plays songs straight off your disk (title/artist/album/art read from file tags), alongside YouTube Music, switchable any time
 - 🎚️ **Fade in / out & 5-band equalizer** — smooth volume ramps on play/pause/stop, plus a graphic EQ (60Hz–12kHz) tunable per session
+- 🎨 **Adaptive album-art theming** — dominant colours are extracted from the current artwork and the whole UI re-tints to match, transitioning smoothly between tracks
+- 📊 **Real-time spectrum visualizer** — a live FFT-driven analyzer in the fullscreen player, tinted to the current artwork
+- ⌨️ **Full keyboard control** — space/arrows/`M`/`L`/`S`/`R`/`F`/`Q`, `/` to search, and `?` for a shortcuts cheatsheet
+- ⚡ **Command palette** — `Ctrl/Cmd+K` fuzzy-jumps to any song, album, playlist, or action
+- 🖱️ **Right-click menus & drag-to-reorder** — Play next, Add to queue, Like, Copy; drag queue items to reorder them
+- 🌙 **Sleep timer** — fades out and pauses after 15/30/45/60 minutes
+- 🪄 **Mini player** — a compact, always-on-top window for when you just need the controls
+- ⏯️ **OS media keys** — play/pause, next, and previous work from your keyboard's media keys
 - 💚 **Liked Songs** — a dedicated, always-pinned playlist for anything you heart
 - 📝 **Lyrics** — fetched live and shown in the fullscreen player
 - 🎮 **Discord Rich Presence** — optionally show what you're listening to on your Discord profile
@@ -45,7 +53,10 @@ Built with 🦀 [Tauri](https://tauri.app), ⚛️ React + TypeScript, and 🎨 
 | Audio playback | [rodio](https://github.com/RustAudio/rodio) + [reqwest](https://github.com/seanmonstar/reqwest) (Rust) |
 | Audio stream resolution | [yt-dlp](https://github.com/yt-dlp/yt-dlp) via the Python sidecar |
 | Local file tag reading | [lofty](https://github.com/Serial-ATA/lofty-rs) + [walkdir](https://github.com/BurntSushi/walkdir) (Rust) |
-| Folder picker | [tauri-plugin-dialog](https://github.com/tauri-apps/plugins-workspace) |
+| Spectrum analysis | [rustfft](https://github.com/ejmahler/RustFFT) (Rust) |
+| Album-art colour extraction | [image](https://github.com/image-rs/image) (Rust) |
+| Folder picker / media keys | [tauri-plugin-dialog](https://github.com/tauri-apps/plugins-workspace), [tauri-plugin-global-shortcut](https://github.com/tauri-apps/plugins-workspace) |
+| Typeface | [Inter](https://rsms.me/inter/) (bundled via `@fontsource-variable/inter`) |
 
 ---
 
@@ -122,6 +133,27 @@ TuneBox can also play music straight from a folder on your computer, no YouTube 
 
 ---
 
+## ⌨️ Keyboard Shortcuts
+
+Press <kbd>?</kbd> anywhere in the app for the full list. The essentials:
+
+| Key | Action |
+|---|---|
+| <kbd>Space</kbd> | Play / pause |
+| <kbd>←</kbd> <kbd>→</kbd> | Seek 5 seconds |
+| <kbd>Shift</kbd> + <kbd>←</kbd>/<kbd>→</kbd> | Previous / next track |
+| <kbd>↑</kbd> <kbd>↓</kbd> | Volume |
+| <kbd>M</kbd> / <kbd>L</kbd> | Mute / like current song |
+| <kbd>S</kbd> / <kbd>R</kbd> | Shuffle / repeat mode |
+| <kbd>F</kbd> / <kbd>Q</kbd> | Fullscreen player / queue |
+| <kbd>/</kbd> | Focus search |
+| <kbd>Ctrl</kbd>+<kbd>K</kbd> | Command palette |
+| <kbd>Esc</kbd> | Close the topmost overlay |
+
+Your keyboard's dedicated media keys (play/pause, next, previous) also control TuneBox while it's running.
+
+---
+
 ## 🎮 Discord Rich Presence (optional)
 
 Show your currently playing song on your Discord profile. No per-user setup — just:
@@ -168,6 +200,8 @@ TuneBox/
 │       ├── network.rs       # LAN device discovery + control (mDNS + TCP)
 │       ├── playback.rs      # Dedicated audio thread: fetch, decode, play, fades
 │       ├── equalizer.rs     # 5-band graphic EQ (custom rodio Source wrapper)
+│       ├── analyzer.rs      # FFT spectrum tap feeding the visualizer
+│       ├── artwork.rs       # Album-art dominant-colour extraction
 │       └── local_library.rs # Local folder scan + tag reading (lofty)
 └── sidecar/                # Python sidecar
     └── main.py               # stdin/stdout JSON bridge around ytmusicapi + yt-dlp

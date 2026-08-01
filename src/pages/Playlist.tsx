@@ -1,8 +1,9 @@
 import { useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
-import { Loader2, Play, Shuffle } from "lucide-react";
 import { CoverArt } from "../components/CoverArt";
-import { TrackRow } from "../components/TrackRow";
+import { TrackList } from "../components/TrackList";
+import { PlayControls } from "../components/PlayControls";
+import { Skeleton, TrackListSkeleton } from "../components/Skeleton";
 import { SignInPrompt } from "../components/SignInPrompt";
 import { usePlayerStore } from "../store/playerStore";
 import { useAuthStore } from "../store/authStore";
@@ -68,9 +69,22 @@ export function Playlist() {
   }
 
   if (!collection) {
+    if (!loading) {
+      return (
+        <div className="flex h-full items-center justify-center text-muted">Playlist not found.</div>
+      );
+    }
     return (
-      <div className="flex h-full items-center justify-center text-muted">
-        {loading ? <Loader2 size={24} className="animate-spin text-accent" /> : "Playlist not found."}
+      <div className="flex flex-col gap-6 px-6 py-6">
+        <div className="flex items-end gap-6">
+          <Skeleton className="h-44 w-44 rounded-xl sm:h-56 sm:w-56" />
+          <div className="flex flex-col gap-3">
+            <Skeleton className="h-3 w-16" />
+            <Skeleton className="h-9 w-64" />
+            <Skeleton className="h-4 w-40" />
+          </div>
+        </div>
+        <TrackListSkeleton rows={10} />
       </div>
     );
   }
@@ -115,33 +129,12 @@ export function Playlist() {
       {error && <p className="text-sm text-red-400">{error}</p>}
 
       {loading ? (
-        <div className="flex justify-center py-12">
-          <Loader2 size={24} className="animate-spin text-accent" />
-        </div>
+        <TrackListSkeleton rows={10} />
       ) : (
         <>
-          <div className="flex items-center gap-4">
-            <button
-              onClick={handlePlay}
-              className="flex h-12 w-12 items-center justify-center rounded-full bg-accent text-black shadow-lg shadow-black/40 transition-transform hover:scale-105"
-              aria-label="Play"
-            >
-              <Play size={20} fill="currentColor" className="ml-0.5" />
-            </button>
-            <button
-              onClick={handleShuffle}
-              className="flex h-10 w-10 items-center justify-center rounded-full bg-surface-2 text-muted hover:text-fg"
-              aria-label="Shuffle play"
-            >
-              <Shuffle size={18} />
-            </button>
-          </div>
+          <PlayControls onPlay={handlePlay} onShuffle={handleShuffle} />
 
-          <div className="flex flex-col gap-1">
-            {trackList.map((track, i) => (
-              <TrackRow key={`${track.id}-${i}`} track={track} index={i} tracks={trackList} />
-            ))}
-          </div>
+          <TrackList tracks={trackList} />
         </>
       )}
     </div>

@@ -4,6 +4,7 @@ import { X } from "lucide-react";
 import { useDiscordStore } from "../store/discordStore";
 import { EQ_BAND_FREQS_HZ, useAudioSettingsStore } from "../store/audioSettingsStore";
 import { useLocalLibraryStore } from "../store/localLibraryStore";
+import { APP_VERSION } from "../lib/version";
 
 export function SettingsModal() {
   const open = useDiscordStore((s) => s.isSettingsOpen);
@@ -19,6 +20,10 @@ export function SettingsModal() {
   const eqBands = useAudioSettingsStore((s) => s.eqBands);
   const setEqBand = useAudioSettingsStore((s) => s.setEqBand);
   const resetEq = useAudioSettingsStore((s) => s.resetEq);
+
+  const sleepTimerEndsAt = useAudioSettingsStore((s) => s.sleepTimerEndsAt);
+  const startSleepTimer = useAudioSettingsStore((s) => s.startSleepTimer);
+  const cancelSleepTimer = useAudioSettingsStore((s) => s.cancelSleepTimer);
 
   const localFolder = useLocalLibraryStore((s) => s.folder);
   const localError = useLocalLibraryStore((s) => s.error);
@@ -138,8 +143,41 @@ export function SettingsModal() {
                   step={100}
                   value={fadeMs}
                   onChange={(e) => setFadeMs(Number(e.target.value))}
-                  className="w-full accent-accent"
+                  className="tb-range h-3 w-full"
+                  style={{ "--fill-pct": `${(fadeMs / 3000) * 100}%` } as React.CSSProperties}
                 />
+              </div>
+
+              <div className="mt-2 flex flex-col gap-1.5">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <div className="text-sm font-semibold">Sleep timer</div>
+                    <div className="text-xs text-muted">
+                      {sleepTimerEndsAt
+                        ? "Playback will fade out and pause when it ends."
+                        : "Automatically pause playback after a while."}
+                    </div>
+                  </div>
+                  {sleepTimerEndsAt && (
+                    <button
+                      onClick={cancelSleepTimer}
+                      className="shrink-0 rounded-full bg-surface-3 px-3 py-1.5 text-xs font-semibold text-fg transition-colors hover:bg-surface-3/70"
+                    >
+                      Cancel
+                    </button>
+                  )}
+                </div>
+                <div className="flex gap-2">
+                  {[15, 30, 45, 60].map((m) => (
+                    <button
+                      key={m}
+                      onClick={() => startSleepTimer(m)}
+                      className="pill flex-1 bg-surface-3 px-3 py-1.5 text-xs font-semibold text-fg transition-colors hover:bg-surface-3/70"
+                    >
+                      {m}m
+                    </button>
+                  ))}
+                </div>
               </div>
 
               <div className="mt-2 flex flex-col gap-2">
@@ -163,8 +201,16 @@ export function SettingsModal() {
                           step={1}
                           value={eqBands[i]}
                           onChange={(e) => setEqBand(i, Number(e.target.value))}
-                          className="accent-accent"
-                          style={{ width: 96, transform: "rotate(-90deg)" }}
+                          className="tb-range tb-range-always"
+                          style={
+                            {
+                              width: 96,
+                              transform: "rotate(-90deg)",
+                              // Bipolar band (-12..+12) mapped to 0-100% so the
+                              // track fills upward as the band is boosted.
+                              "--fill-pct": `${((eqBands[i] + 12) / 24) * 100}%`,
+                            } as React.CSSProperties
+                          }
                           aria-label={`${freq} Hz gain`}
                         />
                       </div>
@@ -174,6 +220,10 @@ export function SettingsModal() {
                     </div>
                   ))}
                 </div>
+              </div>
+
+              <div className="mt-1 border-t border-border pt-3 text-center text-xs text-muted">
+                TuneBox <span className="tabular-nums">{APP_VERSION}</span>
               </div>
             </div>
           </motion.div>

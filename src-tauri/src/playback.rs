@@ -8,6 +8,7 @@ use rodio::{stream::DeviceSinkBuilder, Decoder, Player};
 use serde_json::json;
 use tauri::{AppHandle, Emitter};
 
+use crate::analyzer::{spawn_emitter, Analyzer, SpectrumTap};
 use crate::equalizer::{EqGains, Equalizer, BAND_COUNT};
 
 /// Where to read a track's audio bytes from.
@@ -48,7 +49,9 @@ impl Playback {
         let (tx, rx) = mpsc::channel::<Msg>();
         let fetch_tx = tx.clone();
         let eq_gains = EqGains::flat();
-        std::thread::spawn(move || audio_thread(app, rx, fetch_tx, eq_gains));
+        let tap = SpectrumTap::new();
+        spawn_emitter(app.clone(), tap.clone());
+        std::thread::spawn(move || audio_thread(app, rx, fetch_tx, eq_gains, tap));
         Self { tx }
     }
 
@@ -156,6 +159,7 @@ fn audio_thread(
     rx: std::sync::mpsc::Receiver<Msg>,
     fetch_tx: Sender<Msg>,
     eq_gains: Arc<EqGains>,
+    tap: Arc<SpectrumTap>,
 ) {
     let device_sink = match DeviceSinkBuilder::open_default_sink() {
         Ok(sink) => sink,
@@ -286,7 +290,12 @@ fn audio_thread(
                     {
                         Ok(source) => {
                             let p = Player::connect_new(mixer);
-                            p.append(Equalizer::new(source, eq_gains.clone()));
+                            // EQ first so the visualiser shows what's actually
+                            // being heard, not the pre-EQ signal.
+                            p.append(Analyzer::new(
+                                Equalizer::new(source, eq_gains.clone()),
+                                tap.clone(),
+                            ));
                             p.set_volume(0.0);
                             p.play();
                             fade = if fade_ms == 0 {
@@ -343,5 +352,9 @@ fn audio_thread(
                 let _ = app.emit("playback:position", p.get_pos().as_secs_f64());
             }
         }
+
+        // Derived from the real player state rather than set in each command
+        // branch, so pause/stop/end-of-track all gate the visualiser correctly.
+        tap.set_active(player.as_ref().is_some_and(|p| !p.is_paused()));
     }
 }

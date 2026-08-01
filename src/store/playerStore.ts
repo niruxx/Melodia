@@ -18,6 +18,8 @@ type PlayerState = {
   isQueueOpen: boolean;
   likedIds: Record<string, boolean>;
   playbackError: string | null;
+  /** Volume to restore when unmuting; null when not muted. */
+  premuteVolume: number | null;
 
   /** Set while this device is controlling another device's playback over the
    * network. When present, playback actions are sent over the wire instead
@@ -32,6 +34,11 @@ type PlayerState = {
   jumpTo: (index: number) => void;
   seek: (seconds: number) => void;
   setVolume: (volume: number) => void;
+  toggleMute: () => void;
+  playNext: (track: Track) => void;
+  addToQueue: (track: Track) => void;
+  removeFromQueue: (index: number) => void;
+  reorderQueue: (ids: string[]) => void;
   toggleLike: (id: string) => void;
   toggleShuffle: () => void;
   cycleRepeat: () => void;
@@ -69,6 +76,7 @@ export const usePlayerStore = create<PlayerState>((set, get) => ({
   isQueueOpen: false,
   likedIds: {},
   playbackError: null,
+  premuteVolume: null,
   remoteSend: null,
 
   currentTrack: () => {
@@ -188,8 +196,68 @@ export const usePlayerStore = create<PlayerState>((set, get) => ({
       return;
     }
     const clamped = Math.min(1, Math.max(0, volume));
-    set({ volume: clamped });
+    // Dragging the slider by hand supersedes a mute, so drop the stored
+    // pre-mute level rather than letting a later unmute clobber the choice.
+    set({ volume: clamped, premuteVolume: null });
     invoke("playback_set_volume", { volume: clamped }).catch(() => {});
+  },
+
+  toggleMute: () => {
+    const { premuteVolume, volume, setVolume } = get();
+    if (premuteVolume !== null) {
+      setVolume(premuteVolume);
+      return;
+    }
+    // Restore to something audible if muted from an already-silent slider.
+    const restore = volume > 0 ? volume : 0.8;
+    setVolume(0);
+    set({ premuteVolume: restore });
+  },
+
+  playNext: (track) => {
+    const { queue, queueIndex } = get();
+    if (queue.length === 0) {
+      get().playTrack(track);
+      return;
+    }
+    const next = [...queue];
+    next.splice(queueIndex + 1, 0, track);
+    set({ queue: next });
+  },
+
+  addToQueue: (track) => {
+    const { queue } = get();
+    if (queue.length === 0) {
+      get().playTrack(track);
+      return;
+    }
+    set({ queue: [...queue, track] });
+  },
+
+  removeFromQueue: (index) => {
+    const { queue, queueIndex } = get();
+    if (index < 0 || index >= queue.length) return;
+    // Removing the track that's playing is ambiguous; leave it alone rather
+    // than silently jumping playback somewhere the user didn't ask for.
+    if (index === queueIndex) return;
+    const next = queue.filter((_, i) => i !== index);
+    set({
+      queue: next,
+      // Keep pointing at the same track: only shift when we removed ahead of it.
+      queueIndex: index < queueIndex ? queueIndex - 1 : queueIndex,
+    });
+  },
+
+  reorderQueue: (ids) => {
+    const { queue, queueIndex } = get();
+    const currentId = queue[queueIndex]?.id;
+    const byId = new Map(queue.map((t) => [t.id, t]));
+    const next = ids.map((id) => byId.get(id)).filter((t): t is Track => t != null);
+    if (next.length !== queue.length) return;
+    set({
+      queue: next,
+      queueIndex: currentId ? next.findIndex((t) => t.id === currentId) : queueIndex,
+    });
   },
 
   toggleLike: (id) =>

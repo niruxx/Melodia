@@ -1,5 +1,5 @@
-import { Loader2 } from "lucide-react";
 import { Card } from "../components/Card";
+import { CardGridSkeleton } from "../components/Skeleton";
 import { SignInPrompt } from "../components/SignInPrompt";
 import { useAuthStore } from "../store/authStore";
 import { useLibraryStore } from "../store/libraryStore";
@@ -29,11 +29,7 @@ export function Library() {
           </p>
         )}
 
-        {localLoading && (
-          <div className="flex justify-center py-16">
-            <Loader2 size={24} className="animate-spin text-accent" />
-          </div>
-        )}
+        {localLoading && <CardGridSkeleton cards={6} />}
 
         {localError && <p className="text-sm text-red-400">{localError}</p>}
 
@@ -61,11 +57,7 @@ export function Library() {
     <div className="flex flex-col gap-8 px-6 py-6">
       <h1 className="text-2xl font-semibold tracking-tight">Your Library</h1>
 
-      {loading && (
-        <div className="flex justify-center py-16">
-          <Loader2 size={24} className="animate-spin text-accent" />
-        </div>
-      )}
+      {loading && <CardGridSkeleton />}
 
       {playlists.data && playlists.data.length > 0 && (
         <section className="flex flex-col gap-3">

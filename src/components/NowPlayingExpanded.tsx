@@ -3,7 +3,6 @@ import { AnimatePresence, motion } from "framer-motion";
 import {
   ChevronDown,
   Heart,
-  Loader2,
   Pause,
   Play,
   Repeat,
@@ -13,7 +12,9 @@ import {
   SkipForward,
 } from "lucide-react";
 import clsx from "clsx";
-import { CoverArt, coverGradient } from "./CoverArt";
+import { CoverArt } from "./CoverArt";
+import { Skeleton } from "./Skeleton";
+import { Visualizer } from "./Visualizer";
 import { usePlayerStore } from "../store/playerStore";
 import { useAuthStore } from "../store/authStore";
 import { formatDuration } from "../lib/format";
@@ -75,11 +76,15 @@ export function NowPlayingExpanded() {
           transition={{ duration: 0.25, ease: "easeOut" }}
           className="fixed inset-0 z-50 flex items-center justify-center overflow-hidden"
         >
+          {/* Ambient backdrop built from the artwork's real colours, slowly
+              drifting so the fullscreen view never feels static. */}
           <div
-            className="absolute inset-0 -z-10 opacity-70 blur-3xl"
-            style={{ backgroundImage: coverGradient(`${track.album}-${track.title}`) }}
+            className="ambient-drift absolute inset-0 -z-10 opacity-70 blur-3xl"
+            style={{
+              backgroundImage: `radial-gradient(circle at 30% 30%, var(--accent-dynamic-1), transparent 60%), radial-gradient(circle at 70% 70%, var(--accent-dynamic-2), transparent 60%)`,
+            }}
           />
-          <div className="absolute inset-0 -z-10 bg-base/70" />
+          <div className="absolute inset-0 -z-10 bg-base/90 backdrop-blur-2xl" />
 
           <button
             onClick={() => setExpanded(false)}
@@ -89,14 +94,25 @@ export function NowPlayingExpanded() {
             <ChevronDown size={20} />
           </button>
 
-          <div className="flex w-full max-w-5xl flex-col items-center gap-12 px-8 md:flex-row md:items-center md:justify-center">
-            <div className="flex flex-col items-center">
-              <CoverArt
-                seed={`${track.album}-${track.title}`}
-                src={track.thumbnail}
-                rounded="lg"
-                className="h-72 w-72 sm:h-80 sm:w-80"
-              />
+          <div className="flex max-h-full w-full max-w-5xl flex-col items-center gap-12 overflow-y-auto px-8 py-6 md:flex-row md:items-center md:justify-center">
+            <div className="flex shrink-0 flex-col items-center">
+              {/* A shared-element morph from the now-playing bar was tried here
+                  and removed: the bar stays mounted behind this overlay, so two
+                  live elements claimed the same layoutId and Framer Motion's
+                  absolute positioning broke the centred layout. A plain
+                  entrance animation is well-behaved and reads just as well. */}
+              <motion.div
+                initial={{ scale: 0.92, opacity: 0 }}
+                animate={{ scale: 1, opacity: 1 }}
+                transition={{ duration: 0.3, ease: "easeOut", delay: 0.05 }}
+              >
+                <CoverArt
+                  seed={`${track.album}-${track.title}`}
+                  src={track.thumbnail}
+                  rounded="lg"
+                  className="h-56 w-56 sm:h-72 sm:w-72"
+                />
+              </motion.div>
 
               <div className="mt-8 flex items-center gap-3">
                 <div className="text-center">
@@ -116,18 +132,26 @@ export function NowPlayingExpanded() {
                 <input
                   type="range"
                   min={0}
-                  max={track.duration}
+                  max={track.duration || 1}
                   value={progress}
                   onChange={(e) => seek(Number(e.target.value))}
-                  className="h-1 w-full cursor-pointer appearance-none rounded-full bg-surface-3 accent-accent"
+                  className="tb-range h-3 w-full"
+                  style={
+                    {
+                      "--fill-pct": `${track.duration > 0 ? (progress / track.duration) * 100 : 0}%`,
+                    } as React.CSSProperties
+                  }
+                  aria-label="Seek"
                 />
-                <div className="flex w-full justify-between text-xs text-muted">
+                <div className="flex w-full justify-between text-xs tabular-nums text-muted">
                   <span>{formatDuration(progress)}</span>
                   <span>{formatDuration(track.duration)}</span>
                 </div>
               </div>
 
-              <div className="mt-6 flex items-center gap-6">
+              <Visualizer className="mt-6 h-16 w-full max-w-md" />
+
+              <div className="mt-4 flex items-center gap-6">
                 <button
                   onClick={toggleShuffle}
                   className={clsx("text-muted hover:text-fg", shuffle && "text-accent")}
@@ -171,8 +195,12 @@ export function NowPlayingExpanded() {
                   <p className="text-sm text-muted">Sign in to load lyrics.</p>
                 )}
                 {isSignedIn && lyricsState.loading && (
-                  <div className="flex justify-center py-8">
-                    <Loader2 size={20} className="animate-spin text-accent" />
+                  <div className="flex flex-col gap-3">
+                    {["w-full", "w-11/12", "w-4/5", "w-full", "w-3/4", "w-5/6", "w-2/3", "w-full"].map(
+                      (w, i) => (
+                        <Skeleton key={i} className={clsx("h-3.5", w)} />
+                      ),
+                    )}
                   </div>
                 )}
                 {isSignedIn && !lyricsState.loading && lyricsState.error && (

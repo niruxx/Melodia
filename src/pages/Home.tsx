@@ -1,8 +1,10 @@
-import { Loader2 } from "lucide-react";
+import { Navigate } from "react-router-dom";
 import { Carousel } from "../components/Carousel";
 import { Card } from "../components/Card";
+import { CarouselSkeleton } from "../components/Skeleton";
 import { SignInPrompt } from "../components/SignInPrompt";
 import { useAuthStore } from "../store/authStore";
+import { useSourceStore } from "../store/sourceStore";
 import { useLibraryStore } from "../store/libraryStore";
 import { usePlayCollection } from "../hooks/usePlayCollection";
 import type { Collection, Track } from "../lib/types";
@@ -28,9 +30,16 @@ function greeting(): string {
 
 export function Home() {
   const authState = useAuthStore((s) => s.state);
+  const isLocal = useSourceStore((s) => s.active === "local");
   const home = useLibraryStore((s) => s.home);
   const history = useLibraryStore((s) => s.history);
   const playCollection = usePlayCollection();
+
+  // The home feed is a YouTube Music concept; in Local mode there's nothing to
+  // show here, and demanding a Google sign-in would be nonsense.
+  if (isLocal) {
+    return <Navigate to="/library" replace />;
+  }
 
   if (authState !== "signed_in") {
     return <SignInPrompt />;
@@ -41,9 +50,11 @@ export function Home() {
       <h1 className="text-2xl font-semibold tracking-tight">{greeting()}</h1>
 
       {home.loading && (
-        <div className="flex justify-center py-16">
-          <Loader2 size={24} className="animate-spin text-accent" />
-        </div>
+        <>
+          <CarouselSkeleton />
+          <CarouselSkeleton />
+          <CarouselSkeleton />
+        </>
       )}
 
       {history.data && history.data.length > 0 && (

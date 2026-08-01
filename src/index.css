@@ -13,6 +13,27 @@
   --color-accent-2: #ec4899;
 }
 
+/* Registered so they can be *transitioned* — an unregistered custom property
+   would snap between values instead of animating. Set at runtime from the
+   current track's album art by `src/store/themeStore.ts`; these initial
+   values are the static brand accents used before any art is analyzed. */
+@property --accent-dynamic-1 {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: #7c5cff;
+}
+@property --accent-dynamic-2 {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: #ec4899;
+}
+
+:root {
+  transition:
+    --accent-dynamic-1 700ms ease,
+    --accent-dynamic-2 700ms ease;
+}
+
 html,
 body,
 #root {
@@ -21,6 +42,11 @@ body,
 
 body {
   @apply bg-base text-fg antialiased;
+  font-family:
+    "Inter Variable",
+    ui-sans-serif,
+    system-ui,
+    sans-serif;
   font-feature-settings: "cv11", "ss01";
 }
 
@@ -65,4 +91,177 @@ body {
 
 .pill {
   border-radius: 9999px;
+}
+
+/* ---------------------------------------------------------------- *
+ * Keyframes
+ * ---------------------------------------------------------------- */
+
+@keyframes shimmer {
+  100% {
+    transform: translateX(100%);
+  }
+}
+
+/* The "this track is playing" bars. Each bar sets its own animation-delay
+   so they ripple instead of pulsing in lockstep. */
+@keyframes eq-bar {
+  0%,
+  100% {
+    transform: scaleY(0.35);
+  }
+  50% {
+    transform: scaleY(1);
+  }
+}
+
+@keyframes marquee {
+  0%,
+  12% {
+    transform: translateX(0);
+  }
+  88%,
+  100% {
+    transform: translateX(var(--marquee-shift, 0px));
+  }
+}
+
+@keyframes fade-up {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes ambient-drift {
+  0%,
+  100% {
+    transform: translate3d(0, 0, 0) scale(1);
+  }
+  50% {
+    transform: translate3d(0, -3%, 0) scale(1.08);
+  }
+}
+
+/* ---------------------------------------------------------------- *
+ * Skeletons
+ * ---------------------------------------------------------------- */
+
+.skeleton {
+  position: relative;
+  overflow: hidden;
+  background-color: var(--color-surface-2);
+}
+
+.skeleton::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  transform: translateX(-100%);
+  background-image: linear-gradient(
+    90deg,
+    transparent,
+    color-mix(in srgb, var(--color-surface-3) 85%, white 15%),
+    transparent
+  );
+  animation: shimmer 1.6s infinite;
+}
+
+/* ---------------------------------------------------------------- *
+ * Playing indicator
+ * ---------------------------------------------------------------- */
+
+.eq-bar {
+  transform-origin: bottom;
+  animation: eq-bar 900ms ease-in-out infinite;
+}
+
+/* ---------------------------------------------------------------- *
+ * Ambient album-art backdrop
+ * ---------------------------------------------------------------- */
+
+.ambient-drift {
+  animation: ambient-drift 18s ease-in-out infinite;
+}
+
+/* ---------------------------------------------------------------- *
+ * Range inputs (scrubber + volume)
+ *
+ * `--fill-pct` is set inline by the component so the played portion is
+ * tinted without needing a second overlay element.
+ * ---------------------------------------------------------------- */
+
+input[type="range"].tb-range {
+  -webkit-appearance: none;
+  appearance: none;
+  background: transparent;
+  cursor: pointer;
+}
+
+input[type="range"].tb-range::-webkit-slider-runnable-track {
+  height: 4px;
+  border-radius: 9999px;
+  background: linear-gradient(
+    to right,
+    var(--accent-dynamic-1) 0%,
+    var(--accent-dynamic-1) var(--fill-pct, 0%),
+    var(--color-surface-3) var(--fill-pct, 0%),
+    var(--color-surface-3) 100%
+  );
+}
+
+input[type="range"].tb-range::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  height: 12px;
+  width: 12px;
+  margin-top: -4px;
+  border-radius: 9999px;
+  background: var(--color-fg);
+  box-shadow: 0 1px 4px rgb(0 0 0 / 0.5);
+  opacity: 0;
+  transition:
+    opacity 150ms ease,
+    transform 150ms ease;
+}
+
+input[type="range"].tb-range:hover::-webkit-slider-thumb,
+input[type="range"].tb-range:focus-visible::-webkit-slider-thumb {
+  opacity: 1;
+}
+
+/* Reveal-on-hover suits a scrubber, where the fill already shows the value.
+   On a control like the EQ the thumb *is* the readout, so keep it visible. */
+input[type="range"].tb-range-always::-webkit-slider-thumb {
+  opacity: 1;
+}
+
+input[type="range"].tb-range:active::-webkit-slider-thumb {
+  transform: scale(1.15);
+}
+
+input[type="range"].tb-range:disabled {
+  cursor: default;
+}
+input[type="range"].tb-range:disabled::-webkit-slider-thumb {
+  opacity: 0;
+}
+
+/* ---------------------------------------------------------------- *
+ * Accessibility
+ * ---------------------------------------------------------------- */
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
 }

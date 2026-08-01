@@ -1,7 +1,8 @@
 import { useEffect, useState } from "react";
 import { useSearchParams } from "react-router-dom";
-import { Loader2, Search as SearchIcon } from "lucide-react";
-import { TrackRow } from "../components/TrackRow";
+import { Search as SearchIcon } from "lucide-react";
+import { TrackList } from "../components/TrackList";
+import { TrackListSkeleton } from "../components/Skeleton";
 import { SignInPrompt } from "../components/SignInPrompt";
 import { useAuthStore } from "../store/authStore";
 import { useSourceStore } from "../store/sourceStore";
@@ -75,15 +76,11 @@ export function Search() {
 
   return (
     <div className="flex flex-col gap-8 px-6 py-6">
-      <h1 className="text-xl font-semibold tracking-tight">
+      <h1 className="text-2xl font-semibold tracking-tight">
         Results for <span className="gradient-text">&ldquo;{query}&rdquo;</span>
       </h1>
 
-      {loading && (
-        <div className="flex justify-center py-12">
-          <Loader2 size={24} className="animate-spin text-accent" />
-        </div>
-      )}
+      {loading && <TrackListSkeleton rows={8} />}
 
       {error && <p className="text-sm text-red-400">{error}</p>}
 
@@ -92,9 +89,7 @@ export function Search() {
       {results.length > 0 && (
         <section className="flex flex-col gap-1">
           <h2 className="mb-2 text-lg font-semibold tracking-tight">Songs</h2>
-          {results.map((track, i) => (
-            <TrackRow key={`${track.id}-${i}`} track={track} index={i} tracks={results} />
-          ))}
+          <TrackList tracks={results} />
         </section>
       )}
     </div>

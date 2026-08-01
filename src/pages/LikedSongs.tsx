@@ -1,6 +1,7 @@
 import { useMemo } from "react";
-import { Heart, Play, Shuffle } from "lucide-react";
-import { TrackRow } from "../components/TrackRow";
+import { Heart } from "lucide-react";
+import { TrackList } from "../components/TrackList";
+import { PlayControls } from "../components/PlayControls";
 import { allTracks } from "../lib/mockData";
 import { usePlayerStore } from "../store/playerStore";
 import { useLibraryStore } from "../store/libraryStore";
@@ -37,7 +38,7 @@ export function LikedSongs() {
   return (
     <div className="flex flex-col gap-6 px-6 py-6">
       <div className="flex items-end gap-6">
-        <div className="flex h-44 w-44 shrink-0 items-center justify-center rounded-md bg-gradient-to-br from-indigo-500 to-accent-2 shadow-lg shadow-black/50 sm:h-56 sm:w-56">
+        <div className="brand-mark flex h-44 w-44 shrink-0 items-center justify-center rounded-xl shadow-lg shadow-black/50 sm:h-56 sm:w-56">
           <Heart size={72} className="text-white" fill="currentColor" />
         </div>
         <div className="flex flex-col gap-2">
@@ -48,35 +49,16 @@ export function LikedSongs() {
       </div>
 
       {tracks.length > 0 && (
-        <div className="flex items-center gap-4">
-          <button
-            onClick={handlePlay}
-            className="flex h-12 w-12 items-center justify-center rounded-full bg-accent text-black shadow-lg shadow-black/40 transition-transform hover:scale-105"
-            aria-label="Play"
-          >
-            <Play size={20} fill="currentColor" className="ml-0.5" />
-          </button>
-          <button
-            onClick={handleShuffle}
-            className="flex h-10 w-10 items-center justify-center rounded-full bg-surface-2 text-muted hover:text-fg"
-            aria-label="Shuffle play"
-          >
-            <Shuffle size={18} />
-          </button>
-        </div>
+        <PlayControls onPlay={handlePlay} onShuffle={handleShuffle} />
       )}
 
-      <div className="flex flex-col gap-1">
-        {tracks.length > 0 ? (
-          tracks.map((track, i) => (
-            <TrackRow key={`${track.id}-${i}`} track={track} index={i} tracks={tracks} />
-          ))
-        ) : (
-          <div className="py-16 text-center text-muted">
-            Songs you like will appear here. Tap the heart icon on any song to save it.
-          </div>
-        )}
-      </div>
+      {tracks.length > 0 ? (
+        <TrackList tracks={tracks} />
+      ) : (
+        <p className="text-muted">
+          Songs you like will appear here. Tap the heart icon on any song to save it.
+        </p>
+      )}
     </div>
   );
 }
