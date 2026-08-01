@@ -280,6 +280,16 @@ def cmd_search(args):
     return require_client().search(args["query"], limit=(args or {}).get("limit", 20))
 
 
+def cmd_get_account_info(_args):
+    """Signed-in account's display name, handle, and avatar URL."""
+    info = require_client().get_account_info() or {}
+    return {
+        "accountName": info.get("accountName"),
+        "channelHandle": info.get("channelHandle"),
+        "accountPhotoUrl": info.get("accountPhotoUrl"),
+    }
+
+
 def cmd_get_lyrics(args):
     yt = require_client()
     watch = yt.get_watch_playlist(videoId=args["videoId"])
@@ -325,6 +335,7 @@ COMMANDS = {
     "get_history": cmd_get_history,
     "get_playlist": cmd_get_playlist,
     "search": cmd_search,
+    "get_account_info": cmd_get_account_info,
     "get_lyrics": cmd_get_lyrics,
     "get_stream_url": cmd_get_stream_url,
 }

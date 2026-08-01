@@ -21,6 +21,9 @@ export function SettingsModal() {
   const setEqBand = useAudioSettingsStore((s) => s.setEqBand);
   const resetEq = useAudioSettingsStore((s) => s.resetEq);
 
+  const runInBackground = useAudioSettingsStore((s) => s.runInBackground);
+  const setRunInBackground = useAudioSettingsStore((s) => s.setRunInBackground);
+
   const sleepTimerEndsAt = useAudioSettingsStore((s) => s.sleepTimerEndsAt);
   const startSleepTimer = useAudioSettingsStore((s) => s.startSleepTimer);
   const cancelSleepTimer = useAudioSettingsStore((s) => s.cancelSleepTimer);
@@ -103,6 +106,27 @@ export function SettingsModal() {
               </div>
 
               {error && <p className="text-sm text-red-400">{error}</p>}
+
+              <div className="flex items-center justify-between">
+                <div>
+                  <div className="text-sm font-semibold">Keep playing in the background</div>
+                  <div className="text-xs text-muted">
+                    Closing the window minimises TuneBox to the system tray instead of quitting,
+                    so music keeps playing. Quit from the tray icon.
+                  </div>
+                </div>
+                <button
+                  onClick={() => setRunInBackground(!runInBackground)}
+                  className={
+                    "shrink-0 rounded-full px-4 py-1.5 text-xs font-semibold transition-colors " +
+                    (runInBackground
+                      ? "bg-accent text-black"
+                      : "bg-surface-3 text-fg hover:bg-surface-3/70")
+                  }
+                >
+                  {runInBackground ? "On" : "Off"}
+                </button>
+              </div>
 
               <div className="mt-2 flex flex-col gap-1.5">
                 <div className="text-sm font-semibold">Local music folder</div>

@@ -111,7 +111,7 @@ fn describe_error(e: &dyn std::error::Error) -> String {
 
 fn fetch_bytes(url: &str, headers: &HashMap<String, String>) -> Result<Vec<u8>, String> {
     let client = reqwest::blocking::Client::builder()
-        .timeout(Duration::from_secs(30))
+        .timeout(Duration::from_secs(60))
         .build()
         .map_err(|e| describe_error(&e))?;
 
@@ -120,7 +120,26 @@ fn fetch_bytes(url: &str, headers: &HashMap<String, String>) -> Result<Vec<u8>, 
         request = request.header(key.as_str(), value.as_str());
     }
 
+    // YouTube deliberately throttles plain full-file GETs on its media CDN.
+    // Measured on a 3.3 MiB track: a plain GET trickles at ~32 KiB/s (never
+    // finishing inside any sane timeout), while the identical request with an
+    // explicit byte range completes in well under a second. Asking for the
+    // whole file *as a range* is what makes playback viable at all.
+    let has_range = headers.keys().any(|k| k.eq_ignore_ascii_case("range"));
+    if !has_range {
+        request = request.header("Range", "bytes=0-");
+    }
+
     let response = request.send().map_err(|e| describe_error(&e))?;
+
+    // Surface an HTTP failure directly. Without this an error page body would
+    // be handed to the decoder and reported as an unrecognised audio format,
+    // hiding the real cause (commonly an expired stream URL).
+    let status = response.status();
+    if !status.is_success() {
+        return Err(format!("stream request failed: HTTP {status}"));
+    }
+
     response
         .bytes()
         .map(|b| b.to_vec())

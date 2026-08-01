@@ -61,6 +61,21 @@ export async function pollOAuth(): Promise<{ status: "pending" | "success" | "er
   return invoke("ytm_poll_oauth");
 }
 
+export type AccountInfo = {
+  accountName: string | null;
+  channelHandle: string | null;
+  accountPhotoUrl: string | null;
+};
+
+export async function getAccountInfo(): Promise<AccountInfo> {
+  const res = await invoke<Partial<AccountInfo>>("ytm_get_account_info");
+  return {
+    accountName: res.accountName ?? null,
+    channelHandle: res.channelHandle ?? null,
+    accountPhotoUrl: res.accountPhotoUrl ?? null,
+  };
+}
+
 export async function signOut(): Promise<void> {
   await invoke("ytm_sign_out");
 }

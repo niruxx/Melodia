@@ -1,5 +1,6 @@
 mod analyzer;
 mod artwork;
+mod background;
 mod commands;
 mod discord;
 mod equalizer;
@@ -9,12 +10,13 @@ mod network;
 mod playback;
 mod sidecar;
 
+use background::BackgroundMode;
 use discord::Discord;
 use network::NetworkState;
 use playback::Playback;
 use sidecar::Sidecar;
 use std::sync::Arc;
-use tauri::{Emitter, Manager};
+use tauri::{Emitter, Manager, WindowEvent};
 
 // Learn more about Tauri commands at https://tauri.app/develop/calling-rust/
 #[tauri::command]
@@ -65,6 +67,26 @@ pub fn run() {
             app.manage(Arc::new(NetworkState::new()));
             app.manage(Playback::spawn(app.handle().clone()));
             app.manage(artwork::ArtworkCache::new());
+            app.manage(BackgroundMode::new());
+            background::build_tray(app.handle())?;
+
+            // Closing the main window hides it instead of quitting while
+            // background mode is on, so playback (which lives on its own
+            // thread) keeps running. The tray's Quit item is the way out.
+            if let Some(main) = app.get_webview_window("main") {
+                let handle = app.handle().clone();
+                main.on_window_event(move |event| {
+                    if let WindowEvent::CloseRequested { api, .. } = event {
+                        let mode = handle.state::<BackgroundMode>();
+                        if mode.is_enabled() && !mode.is_quitting() {
+                            api.prevent_close();
+                            if let Some(w) = handle.get_webview_window("main") {
+                                let _ = w.hide();
+                            }
+                        }
+                    }
+                });
+            }
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
@@ -81,6 +103,7 @@ pub fn run() {
             commands::ytm_get_history,
             commands::ytm_get_playlist,
             commands::ytm_search,
+            commands::ytm_get_account_info,
             commands::ytm_get_lyrics,
             commands::discord_connect,
             commands::discord_update_presence,
@@ -106,6 +129,7 @@ pub fn run() {
             artwork::artwork_palette,
             google_login::google_login_start,
             google_login::google_login_cancel,
+            background::set_background_mode,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

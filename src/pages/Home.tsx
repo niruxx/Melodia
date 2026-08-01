@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { Navigate } from "react-router-dom";
 import { Carousel } from "../components/Carousel";
 import { Card } from "../components/Card";
@@ -6,6 +7,7 @@ import { SignInPrompt } from "../components/SignInPrompt";
 import { useAuthStore } from "../store/authStore";
 import { useSourceStore } from "../store/sourceStore";
 import { useLibraryStore } from "../store/libraryStore";
+import { useAccountStore } from "../store/accountStore";
 import { usePlayCollection } from "../hooks/usePlayCollection";
 import type { Collection, Track } from "../lib/types";
 
@@ -20,6 +22,7 @@ function trackAsCollection(track: Track): Collection {
   };
 }
 
+/** Shown while the account name loads, or if it can't be fetched. */
 function greeting(): string {
   const hour = new Date().getHours();
   if (hour < 5) return "Late night";
@@ -33,7 +36,10 @@ export function Home() {
   const isLocal = useSourceStore((s) => s.active === "local");
   const home = useLibraryStore((s) => s.home);
   const history = useLibraryStore((s) => s.history);
+  const account = useAccountStore((s) => s.info);
+  const accountLoading = useAccountStore((s) => s.loading);
   const playCollection = usePlayCollection();
+  const [avatarFailed, setAvatarFailed] = useState(false);
 
   // The home feed is a YouTube Music concept; in Local mode there's nothing to
   // show here, and demanding a Google sign-in would be nonsense.
@@ -47,7 +53,32 @@ export function Home() {
 
   return (
     <div className="flex flex-col gap-8 px-6 py-6">
-      <h1 className="text-2xl font-semibold tracking-tight">{greeting()}</h1>
+      <div className="flex items-center gap-3">
+        {account?.accountPhotoUrl && !avatarFailed ? (
+          <img
+            src={account.accountPhotoUrl}
+            alt=""
+            referrerPolicy="no-referrer"
+            onError={() => setAvatarFailed(true)}
+            className="h-11 w-11 shrink-0 rounded-full object-cover shadow-lg shadow-black/40"
+          />
+        ) : (
+          account?.accountName && (
+            // Initial-in-a-circle stand-in when the photo is absent or blocked.
+            <div className="brand-mark flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-lg font-semibold text-white shadow-lg shadow-black/40">
+              {account.accountName.trim().charAt(0).toUpperCase()}
+            </div>
+          )
+        )}
+        <div className="min-w-0">
+          <h1 className="truncate text-2xl font-semibold tracking-tight">
+            {account?.accountName ?? (accountLoading ? "" : greeting())}
+          </h1>
+          {account?.channelHandle && (
+            <p className="truncate text-sm text-muted">{account.channelHandle}</p>
+          )}
+        </div>
+      </div>
 
       {home.loading && (
         <>

@@ -36,6 +36,7 @@ import { useAudioSettingsStore } from "./store/audioSettingsStore";
 import { useSourceStore } from "./store/sourceStore";
 import { useLocalLibraryStore } from "./store/localLibraryStore";
 import { useThemeStore } from "./store/themeStore";
+import { useAccountStore } from "./store/accountStore";
 
 const routes = [
   { path: "/", element: <Home /> },
@@ -86,8 +87,10 @@ function App() {
   useEffect(() => {
     if (authState === "signed_in") {
       useLibraryStore.getState().fetchAll();
+      useAccountStore.getState().fetch();
     } else {
       useLibraryStore.getState().reset();
+      useAccountStore.getState().reset();
     }
   }, [authState]);
 

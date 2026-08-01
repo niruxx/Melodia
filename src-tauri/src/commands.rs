@@ -92,6 +92,11 @@ pub async fn ytm_search(sidecar: State<'_, Sidecar>, query: String) -> Result<Va
 }
 
 #[tauri::command]
+pub async fn ytm_get_account_info(sidecar: State<'_, Sidecar>) -> Result<Value, String> {
+    sidecar.call("get_account_info", serde_json::json!({})).await
+}
+
+#[tauri::command]
 pub async fn ytm_get_lyrics(sidecar: State<'_, Sidecar>, video_id: String) -> Result<Value, String> {
     sidecar
         .call("get_lyrics", serde_json::json!({ "videoId": video_id }))

@@ -18,21 +18,51 @@ export function TopBar() {
   const isSignedIn = authState === "signed_in";
   const openSettings = useDiscordStore((s) => s.openSettings);
 
+  // Read inside the debounce callback so it sees the current route without
+  // being an effect dependency — depending on it would re-run the effect on
+  // every navigation.
+  const pathnameRef = useRef(location.pathname);
+  pathnameRef.current = location.pathname;
+
+  // Only an actual keystroke may trigger a search navigation. Without this
+  // guard, anything that re-runs the effect (notably a route change) would
+  // re-navigate to /search while text was still in the box, yanking the user
+  // back out of the tab they just clicked.
+  const typedRef = useRef(false);
+
+  function handleQueryChange(value: string) {
+    typedRef.current = true;
+    setQuery(value);
+  }
+
   // Search as the user types, debounced so a remote lookup doesn't fire on
   // every keystroke. `replace` keeps the back button useful instead of
   // stacking one history entry per character.
-  const onSearchPage = location.pathname === "/search";
   useEffect(() => {
+    if (!typedRef.current) return;
     const trimmed = query.trim();
     if (trimmed.length < MIN_QUERY_LENGTH) return;
     const id = setTimeout(() => {
-      navigate(`/search?q=${encodeURIComponent(trimmed)}`, { replace: onSearchPage });
+      typedRef.current = false;
+      navigate(`/search?q=${encodeURIComponent(trimmed)}`, {
+        replace: pathnameRef.current === "/search",
+      });
     }, DEBOUNCE_MS);
     return () => clearTimeout(id);
-  }, [query, navigate, onSearchPage]);
+  }, [query, navigate]);
+
+  // Leaving the search page cancels the search outright: drop any pending
+  // navigation and empty the box, so a stale query can't pull the user back.
+  useEffect(() => {
+    if (location.pathname !== "/search") {
+      typedRef.current = false;
+      setQuery("");
+    }
+  }, [location.pathname]);
 
   function submitSearch(e: React.FormEvent) {
     e.preventDefault();
+    typedRef.current = false;
     navigate(`/search${query ? `?q=${encodeURIComponent(query)}` : ""}`);
   }
 
@@ -62,7 +92,7 @@ export function TopBar() {
             ref={inputRef}
             type="search"
             value={query}
-            onChange={(e) => setQuery(e.target.value)}
+            onChange={(e) => handleQueryChange(e.target.value)}
             placeholder="What do you want to play?    /"
             className="w-full bg-transparent text-fg outline-none placeholder:text-muted [&::-webkit-search-cancel-button]:hidden"
           />
@@ -70,6 +100,9 @@ export function TopBar() {
             <button
               type="button"
               onClick={() => {
+                // Cancel any in-flight debounce too, so clearing the box
+                // can't be followed by a stray navigation to /search.
+                typedRef.current = false;
                 setQuery("");
                 inputRef.current?.focus();
               }}

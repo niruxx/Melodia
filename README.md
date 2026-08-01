@@ -6,7 +6,7 @@
 
 Built with 🦀 [Tauri](https://tauri.app), ⚛️ React + TypeScript, and 🎨 Tailwind CSS — inspired by Spotify's layout, styled as its own thing.
 
-`v0.2.0a-PRE` &nbsp;·&nbsp; shown in **Settings**, defined in [`src/lib/version.ts`](src/lib/version.ts)
+`v0.3.0-PRE` &nbsp;·&nbsp; shown in **Settings**, defined in [`src/lib/version.ts`](src/lib/version.ts)
 
 ![TuneBox screenshot](docs/screenshot.png)
 
@@ -27,6 +27,7 @@ Built with 🦀 [Tauri](https://tauri.app), ⚛️ React + TypeScript, and 🎨 
 - ⌨️ **Full keyboard control** — space/arrows/`M`/`L`/`S`/`R`/`F`/`Q`, `/` to search, and `?` for a shortcuts cheatsheet
 - ⚡ **Command palette** — `Ctrl/Cmd+K` fuzzy-jumps to any song, album, playlist, or action
 - 🖱️ **Right-click menus & drag-to-reorder** — Play next, Add to queue, Like, Copy; drag queue items to reorder them
+- 🎧 **Background playback** — optionally close the window to the system tray and keep the music going, with play/pause/next/previous right in the tray menu
 - 🌙 **Sleep timer** — fades out and pauses after 15/30/45/60 minutes
 - 🪄 **Mini player** — a compact, always-on-top window for when you just need the controls
 - ⏯️ **OS media keys** — play/pause, next, and previous work from your keyboard's media keys
@@ -142,6 +143,22 @@ TuneBox can also play music straight from a folder on your computer, no YouTube 
 
 ---
 
+## 🎧 Background Playback
+
+By default, closing the window quits TuneBox. To keep music playing instead:
+
+1. Open ⚙️ **Settings**
+2. Turn **Keep playing in the background** on
+
+Closing the window now hides it to the system tray rather than quitting. The tray icon gives you:
+
+- **Left-click** — bring the window back
+- **Right-click** — Show TuneBox, Previous / Play-Pause / Next, and **Quit TuneBox**
+
+Quitting from the tray is the way to actually exit while this is enabled. The setting is remembered between launches, and playback continues uninterrupted because the audio engine runs on its own thread independent of the window.
+
+---
+
 ## ⌨️ Keyboard Shortcuts
 
 Press <kbd>?</kbd> anywhere in the app for the full list. The essentials:
@@ -246,6 +263,7 @@ TuneBox/
 │       ├── analyzer.rs      # FFT spectrum tap feeding the visualizer
 │       ├── artwork.rs       # Album-art dominant-colour extraction
 │       ├── google_login.rs  # Google sign-in window + session cookie capture
+│       ├── background.rs    # Tray icon + close-to-tray background mode
 │       └── local_library.rs # Local folder scan + tag reading (lofty)
 └── sidecar/                # Python sidecar
     └── main.py               # stdin/stdout JSON bridge around ytmusicapi + yt-dlp
@@ -258,7 +276,7 @@ TuneBox/
 - 📦 **No packaged installers yet** — `npm run tauri build` produces a binary, but signed installers/auto-update aren't set up.
 - 🍎 **One titlebar style everywhere** — the custom titlebar uses the same right-aligned controls on Windows, macOS, and Linux rather than native macOS traffic lights.
 - 🔓 **LAN device control has no encryption** — beyond the on-device Accept/Decline prompt, there's no auth on the local control connection; fine for a trusted home network, not intended for untrusted networks.
-- ⏳ **Playback buffers the full track before playing** rather than true progressive streaming — simpler and more robust, at the cost of a short delay (typically a couple seconds) before audio starts. Stream resolution and downloading happen on a background thread, so rapid back-to-back skipping stays responsive, but stream URLs aren't cached, so replaying a track re-resolves and re-downloads it.
+- ⏳ **Playback buffers the full track before playing** rather than true progressive streaming — simpler and more robust, at the cost of a short delay (~1.5s measured) before audio starts. The download uses an explicit HTTP byte range: YouTube throttles plain full-file GETs on its media CDN to a trickle (~32 KiB/s measured, versus several MiB/s for the identical ranged request), so a range request is what makes this practical at all. Stream resolution and downloading happen on a background thread, so rapid back-to-back skipping stays responsive, but stream URLs aren't cached, so replaying a track re-resolves and re-downloads it.
 - 🍪 **Google sign-in sessions expire** — the default cookie-based sign-in lasts weeks, not forever, and is invalidated by a password change; you'll re-sign-in occasionally. The OAuth fallback refreshes silently if that matters to you.
 - 📡 **Local tracks can't be cast to another device** — "Connect to a device" only works for YouTube tracks today, since the controlled device wouldn't have the same file on its own disk.
 

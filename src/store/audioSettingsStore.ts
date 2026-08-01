@@ -5,6 +5,7 @@ import { toast } from "./toastStore";
 
 const FADE_MS_KEY = "tunebox:fade-ms";
 const EQ_BANDS_KEY = "tunebox:eq-bands";
+const BACKGROUND_KEY = "tunebox:run-in-background";
 const DEFAULT_FADE_MS = 400;
 
 /** Must match `BAND_FREQS_HZ` in `src-tauri/src/equalizer.rs`. */
@@ -17,10 +18,13 @@ type AudioSettingsStore = {
   eqBands: number[];
   /** Epoch ms at which playback should pause, or null when no timer is set. */
   sleepTimerEndsAt: number | null;
+  /** Keep running (and playing) in the tray when the window is closed. */
+  runInBackground: boolean;
   init: () => void;
   setFadeMs: (ms: number) => void;
   setEqBand: (index: number, db: number) => void;
   resetEq: () => void;
+  setRunInBackground: (value: boolean) => void;
   startSleepTimer: (minutes: number) => void;
   cancelSleepTimer: () => void;
 };
@@ -31,6 +35,7 @@ export const useAudioSettingsStore = create<AudioSettingsStore>((set, get) => ({
   fadeMs: DEFAULT_FADE_MS,
   eqBands: FLAT_EQ,
   sleepTimerEndsAt: null,
+  runInBackground: false,
 
   init: () => {
     const rawFade = localStorage.getItem(FADE_MS_KEY);
@@ -50,9 +55,14 @@ export const useAudioSettingsStore = create<AudioSettingsStore>((set, get) => ({
       }
     }
 
-    set({ fadeMs, eqBands });
+    const runInBackground = localStorage.getItem(BACKGROUND_KEY) === "true";
+
+    set({ fadeMs, eqBands, runInBackground });
     invoke("playback_set_fade_ms", { ms: fadeMs }).catch(() => {});
     invoke("playback_set_eq", { bands: eqBands }).catch(() => {});
+    // Rust owns this at close time, so it must be told the stored value even
+    // when nothing has changed this session.
+    invoke("set_background_mode", { enabled: runInBackground }).catch(() => {});
   },
 
   setFadeMs: (ms) => {
@@ -75,6 +85,12 @@ export const useAudioSettingsStore = create<AudioSettingsStore>((set, get) => ({
     localStorage.setItem(EQ_BANDS_KEY, JSON.stringify(FLAT_EQ));
     set({ eqBands: FLAT_EQ });
     invoke("playback_set_eq", { bands: FLAT_EQ }).catch(() => {});
+  },
+
+  setRunInBackground: (value) => {
+    localStorage.setItem(BACKGROUND_KEY, String(value));
+    set({ runInBackground: value });
+    invoke("set_background_mode", { enabled: value }).catch(() => {});
   },
 
   startSleepTimer: (minutes) => {
