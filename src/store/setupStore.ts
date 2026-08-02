@@ -2,8 +2,12 @@ import { create } from "zustand";
 
 const COMPLETED_KEY = "melodia:setup-complete";
 
-/** Ordered steps of the first-launch wizard. */
-export const SETUP_STEPS = ["welcome", "theme", "audio", "account"] as const;
+/** Ordered steps of the first-launch wizard.
+ *
+ * "python" comes first because it's the only step that can block the others:
+ * signing in needs the helper it provisions.
+ */
+export const SETUP_STEPS = ["welcome", "python", "theme", "audio", "account"] as const;
 export type SetupStep = (typeof SETUP_STEPS)[number];
 
 type SetupStore = {
@@ -17,6 +21,11 @@ type SetupStore = {
   finish: () => void;
   /** Lets the wizard be replayed from Settings. */
   restart: () => void;
+  /** Jumps straight to one step, opening the wizard if it is closed. */
+  openStep: (step: SetupStep) => void;
+  /** As `openStep`, but yields to a wizard that is already running — a
+   *  first launch visits every step anyway. */
+  requireStep: (step: SetupStep) => void;
 };
 
 export const useSetupStore = create<SetupStore>((set, get) => ({
@@ -44,4 +53,11 @@ export const useSetupStore = create<SetupStore>((set, get) => ({
   },
 
   restart: () => set({ isOpen: true, stepIndex: 0 }),
+
+  openStep: (step) => set({ isOpen: true, stepIndex: Math.max(0, SETUP_STEPS.indexOf(step)) }),
+
+  requireStep: (step) => {
+    if (get().isOpen) return;
+    get().openStep(step);
+  },
 }));

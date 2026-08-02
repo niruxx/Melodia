@@ -40,6 +40,7 @@ export function SettingsModal() {
   const refreshOutputDevices = useAudioSettingsStore((s) => s.refreshOutputDevices);
   const streamFormat = usePlayerStore((s) => s.streamFormat);
   const restartSetup = useSetupStore((s) => s.restart);
+  const openSetupStep = useSetupStore((s) => s.openStep);
 
   const runInBackground = useAudioSettingsStore((s) => s.runInBackground);
   const setRunInBackground = useAudioSettingsStore((s) => s.setRunInBackground);
@@ -364,6 +365,15 @@ export function SettingsModal() {
               </div>
 
               <div className="mt-1 flex flex-col items-center gap-2 border-t border-border pt-3">
+                <button
+                  onClick={() => {
+                    onClose();
+                    openSetupStep("python");
+                  }}
+                  className="text-xs text-muted underline transition-colors hover:text-fg"
+                >
+                  Check the music service helper
+                </button>
                 <button
                   onClick={() => {
                     onClose();

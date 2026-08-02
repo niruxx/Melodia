@@ -22,11 +22,44 @@ import threading
 import time
 from pathlib import Path
 
-import requests
-import yt_dlp
-from ytmusicapi import YTMusic
-from ytmusicapi.auth.oauth.credentials import OAuthCredentials
-from ytmusicapi.helpers import get_authorization, initialize_headers, sapisid_from_cookie
+# Anything that goes wrong at startup is *recorded*, never raised. The app can
+# only observe this process through its stdio, so an exception at import time
+# reaches the user as "the helper stopped running" and nothing else. Holding the
+# reason instead lets `ping` report it and every command fail with something
+# actionable.
+STARTUP_ERROR = None
+
+try:
+    import requests
+    import yt_dlp
+    from ytmusicapi import YTMusic
+    from ytmusicapi.auth.oauth.credentials import OAuthCredentials
+    from ytmusicapi.helpers import get_authorization, initialize_headers, sapisid_from_cookie
+except Exception as _import_error:
+    STARTUP_ERROR = (
+        f"the Python helper is missing its packages ({_import_error}). "
+        "Open Settings and choose \"Check the music service helper\" to install "
+        "them, or run: pip install -r sidecar/requirements.txt"
+    )
+
+# stdout *is* the wire protocol, so a stray print or a library's progress output
+# lands in the middle of a response line and corrupts it. Keep the real stdout
+# private and point `sys.stdout` at stderr, which the app captures to a log.
+_WIRE = sys.stdout
+sys.stdout = sys.stderr
+
+# Both directions are pinned to UTF-8. On Windows a text stream otherwise uses
+# the machine's ANSI code page, which is the difference between a workstation
+# that works and one that doesn't. `newline="\n"` keeps CRLF translation from
+# rewriting the line framing.
+try:
+    _WIRE.reconfigure(encoding="utf-8", errors="replace", newline="\n")
+except Exception:
+    pass
+try:
+    sys.stderr.reconfigure(encoding="utf-8", errors="replace")
+except Exception:
+    pass
 
 # `main()` handles one command at a time, so a request that never returns
 # doesn't just fail its own command — it wedges every command queued behind it,
@@ -34,21 +67,26 @@ from ytmusicapi.helpers import get_authorization, initialize_headers, sapisid_fr
 # a timeout, so we have to impose one.
 REQUEST_TIMEOUT_SECONDS = 20
 
+if STARTUP_ERROR is None:
 
-class TimeoutSession(requests.Session):
-    """A requests session that refuses to wait forever."""
+    class TimeoutSession(requests.Session):
+        """A requests session that refuses to wait forever."""
 
-    def request(self, *args, **kwargs):
-        kwargs.setdefault("timeout", REQUEST_TIMEOUT_SECONDS)
-        return super().request(*args, **kwargs)
+        def request(self, *args, **kwargs):
+            kwargs.setdefault("timeout", REQUEST_TIMEOUT_SECONDS)
+            return super().request(*args, **kwargs)
 
 
-def new_ytmusic(**kwargs) -> YTMusic:
+def new_ytmusic(**kwargs) -> "YTMusic":
     """Builds a YTMusic client whose requests are guaranteed to time out."""
     return YTMusic(requests_session=TimeoutSession(), **kwargs)
 
 DATA_DIR = Path(sys.argv[1]) if len(sys.argv) > 1 else Path(".")
-DATA_DIR.mkdir(parents=True, exist_ok=True)
+try:
+    DATA_DIR.mkdir(parents=True, exist_ok=True)
+except Exception as e:
+    if STARTUP_ERROR is None:
+        STARTUP_ERROR = f"the Python helper can't write to its data folder ({DATA_DIR}): {e}"
 CONFIG_PATH = DATA_DIR / "ytmusic_config.json"
 TOKEN_PATH = DATA_DIR / "ytmusic_oauth.json"
 BROWSER_AUTH_PATH = DATA_DIR / "ytmusic_browser.json"
@@ -687,7 +725,18 @@ def cmd_get_stream_url(args):
     }
 
 
+def cmd_ping(_args):
+    """Startup handshake.
+
+    Answers even when the helper came up broken, which is the whole point: the
+    app can then report *why* it is unusable instead of watching a process go
+    quiet, and can try a different interpreter if this one lacks the packages.
+    """
+    return {"startupError": STARTUP_ERROR}
+
+
 COMMANDS = {
+    "ping": cmd_ping,
     "auth_status": cmd_auth_status,
     "set_browser_auth": cmd_set_browser_auth,
     "set_credentials": cmd_set_credentials,
@@ -722,6 +771,11 @@ THREADED_COMMANDS = {"get_comments", "get_video_url"}
 
 _stdout_lock = threading.Lock()
 
+# A read that keeps failing would otherwise spin forever burning CPU. Real
+# shutdown arrives as an empty read, not an exception, so a handful of retries
+# is generous.
+MAX_READ_FAILURES = 5
+
 
 def respond(resp):
     """Writes one response line.
@@ -730,14 +784,26 @@ def respond(resp):
     corrupt the stream, so writes are serialised. Ordering itself doesn't
     matter — the Rust side correlates replies by `id`.
     """
-    line = json.dumps(resp)
+    try:
+        line = json.dumps(resp)
+    except Exception:
+        line = json.dumps(
+            {"id": resp.get("id"), "ok": False, "error": "response was not serialisable"}
+        )
     with _stdout_lock:
-        sys.stdout.write(line + "\n")
-        sys.stdout.flush()
+        try:
+            _WIRE.write(line + "\n")
+            _WIRE.flush()
+        except Exception:
+            # The app is gone or the pipe broke. Nothing to report it to; stdin
+            # closing ends the loop on its own.
+            pass
 
 
 def run_command(req_id, cmd, args):
     try:
+        if STARTUP_ERROR is not None and cmd != "ping":
+            raise RuntimeError(STARTUP_ERROR)
         handler = COMMANDS.get(cmd)
         if handler is None:
             raise ValueError(f"unknown command: {cmd}")
@@ -750,25 +816,61 @@ def run_command(req_id, cmd, args):
         respond({"id": req_id, "ok": False, "error": f"{cmd or 'request'}: {detail}"})
 
 
+def dispatch(raw):
+    """Parses one raw request line and runs it."""
+    line = raw.decode("utf-8", "replace") if isinstance(raw, (bytes, bytearray)) else raw
+    line = line.strip()
+    if not line:
+        return
+
+    req = json.loads(line)
+    if not isinstance(req, dict):
+        raise ValueError("request must be a JSON object")
+
+    req_id = req.get("id")
+    cmd = req.get("cmd")
+    args = req.get("args")
+    if not isinstance(args, dict):
+        args = {}
+
+    if cmd in THREADED_COMMANDS:
+        threading.Thread(target=run_command, args=(req_id, cmd, args), daemon=True).start()
+    else:
+        run_command(req_id, cmd, args)
+
+
 def main():
-    for line in sys.stdin:
-        line = line.strip()
-        if not line:
-            continue
+    """Serves requests until stdin closes. Nothing else may end this loop.
+
+    Reads *bytes*, deliberately. Iterating `sys.stdin` decodes with the
+    machine's locale encoding — the ANSI code page on Windows — while the app
+    sends raw UTF-8. A search or playlist title containing Cyrillic, CJK or an
+    emoji then raised UnicodeDecodeError from the `for` statement itself, which
+    no handler could catch, and the helper died mid-session on exactly the
+    workstations whose code page happened to disagree. Decoding permissively
+    here makes the loop independent of locale, and the outer `except` means a
+    malformed request costs one error response rather than the process.
+    """
+    stream = getattr(sys.stdin, "buffer", sys.stdin)
+    failures = 0
+
+    while True:
         try:
-            req = json.loads(line)
+            raw = stream.readline()
+            failures = 0
+        except Exception:
+            failures += 1
+            if failures >= MAX_READ_FAILURES:
+                return
+            continue
+
+        if not raw:
+            return  # stdin closed: the app has exited
+
+        try:
+            dispatch(raw)
         except Exception as e:
             respond({"id": None, "ok": False, "error": f"request: {e}"})
-            continue
-
-        req_id = req.get("id")
-        cmd = req.get("cmd")
-        args = req.get("args") or {}
-
-        if cmd in THREADED_COMMANDS:
-            threading.Thread(target=run_command, args=(req_id, cmd, args), daemon=True).start()
-        else:
-            run_command(req_id, cmd, args)
 
 
 if __name__ == "__main__":

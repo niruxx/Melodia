@@ -25,6 +25,8 @@ type AuthStore = {
   isModalOpen: boolean;
 
   init: () => Promise<void>;
+  /** Re-reads the sidecar's view of the session, without touching listeners. */
+  refresh: () => Promise<void>;
   signInWithGoogle: () => Promise<void>;
   setShowOAuthFallback: (value: boolean) => void;
   saveCredentials: (clientId: string, clientSecret: string) => Promise<void>;
@@ -69,13 +71,17 @@ export const useAuthStore = create<AuthStore>((set, get) => ({
   closeModal: () => set({ isModalOpen: false, showOAuthFallback: false }),
   setShowOAuthFallback: (value) => set({ showOAuthFallback: value, error: null }),
 
-  init: async () => {
+  refresh: async () => {
     try {
       const { status, method, oauthConfigured } = await ytmusic.authStatus();
       set({ state: status, method, oauthConfigured });
     } catch (e) {
       set({ state: "signed_out", error: String(e) });
     }
+  },
+
+  init: async () => {
+    await get().refresh();
 
     // The Rust login window reports back here. Registered once at init so a
     // completed sign-in is captured even if the modal has been closed.

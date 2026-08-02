@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import { HashRouter, Route, Routes, useLocation } from "react-router-dom";
 import { AnimatePresence } from "framer-motion";
 import { TitleBar } from "./components/TitleBar";
@@ -42,6 +42,7 @@ import { useLocalLibraryStore } from "./store/localLibraryStore";
 import { useThemeStore } from "./store/themeStore";
 import { useVisualizerStore } from "./store/visualizerStore";
 import { useSetupStore } from "./store/setupStore";
+import { usePythonStore } from "./store/pythonStore";
 import { useVideoStore } from "./store/videoStore";
 import { useUiThemeStore } from "./store/uiThemeStore";
 import { migrateLegacyStorage } from "./lib/storageMigration";
@@ -81,6 +82,8 @@ function App() {
   const currentTrack = usePlayerStore((s) => s.currentTrack());
   const isPlaying = usePlayerStore((s) => s.isPlaying);
   const isMini = useMiniPlayerStore((s) => s.active);
+  /** One Python probe per session, at most. */
+  const pythonChecked = useRef(false);
 
   useMediaKeys();
 
@@ -103,6 +106,24 @@ function App() {
     useSetupStore.getState().init();
     useVideoStore.getState().init();
   }, []);
+
+  // A machine whose Python helper can't run gets the setup step that fixes it,
+  // however long ago the guide was completed. Without this the only symptom is
+  // signing in failing, which says nothing about the cause.
+  //
+  // Deferred until the session is known, and skipped entirely for a signed-in
+  // one: that answer came from the helper, so it is already working, and the
+  // probe costs an interpreter launch of its own.
+  useEffect(() => {
+    if (pythonChecked.current || authState === "checking" || authState === "signed_in") return;
+    pythonChecked.current = true;
+    void usePythonStore
+      .getState()
+      .check()
+      .then((status) => {
+        if (status && !status.ready) useSetupStore.getState().requireStep("python");
+      });
+  }, [authState]);
 
   useEffect(() => {
     if (authState === "signed_in") {

@@ -8,6 +8,7 @@ mod google_login;
 mod local_library;
 mod network;
 mod playback;
+mod python;
 mod sidecar;
 
 use background::BackgroundMode;
@@ -62,8 +63,13 @@ pub fn run() {
             register_media_keys(app.handle());
             let data_dir = app.path().app_data_dir()?;
             let resource_dir = app.path().resource_dir().ok();
-            let sidecar = Sidecar::spawn(data_dir, resource_dir).map_err(std::io::Error::other)?;
+            // Started in the background rather than here: a workstation with no
+            // usable Python should still get an app it can use for local files
+            // and a real explanation in the UI, not a launch that fails.
+            let sidecar = Sidecar::new(data_dir.clone(), resource_dir.clone());
+            sidecar.warm();
             app.manage(sidecar);
+            app.manage(python::PythonSetup::new(resource_dir.as_deref(), data_dir));
             app.manage(Discord::new());
             app.manage(Arc::new(NetworkState::new()));
             app.manage(Playback::spawn(app.handle().clone()));
@@ -115,6 +121,9 @@ pub fn run() {
             commands::ytm_get_comments,
             commands::ytm_get_video_url,
             commands::app_relaunch,
+            python::python_status,
+            python::python_open_installer,
+            python::python_install_packages,
             commands::discord_connect,
             commands::discord_update_presence,
             commands::discord_disconnect,

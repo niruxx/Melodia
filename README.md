@@ -181,8 +181,61 @@ each platform must be built on that platform.
 
 > [!IMPORTANT]
 > **Python is needed to run Melodia, not just to build it.** The installer
-> bundles the helper script, but the machine still needs Python 3 on `PATH`
-> plus the packages in `sidecar/requirements.txt`.
+> bundles the helper script, but the machine still needs Python 3.9+ plus the
+> packages in `sidecar/requirements.txt`. The first-run setup guide checks for
+> both and installs the packages itself, so an end user doesn't have to touch a
+> terminal — see below.
+
+<details>
+<summary><b>How the setup guide provisions Python</b></summary>
+
+<br>
+
+The **Set up the music service** step of the first-run guide probes every
+interpreter Melodia would use, and asks each one to import the helper's packages
+rather than just checking that it launches. It reports the two halves
+separately, each with its own fix:
+
+| Check | If it fails |
+| --- | --- |
+| **Python** | **Get Python** — opens the [Python Install Manager](https://apps.microsoft.com/detail/9NQ7512CXL7T) in the Microsoft Store on Windows (per-user, no administrator), or python.org elsewhere |
+| **Helper packages** | **Install** — runs `pip install -r sidecar/requirements.txt` against the detected interpreter, streaming pip's output into the step |
+
+The pip run is always available, including when the check is happy — it becomes
+**Run pip again**, so a machine that is broken in a way the check can't see can
+still be repaired from the UI. A system-wide interpreter that refuses to be
+written to is retried per-user (`--user`) rather than asking for elevation. Once
+an install succeeds the sidecar picks it up on its next call, so nothing needs
+restarting.
+
+`sidecar/requirements.txt` ships inside the installer (it's a Tauri resource,
+alongside `main.py`) *and* is compiled into the binary, so pip has something to
+work from even if the installed copy goes missing.
+
+The step is skippable — Melodia still plays local files without it — and it
+reopens on the next launch for as long as the helper can't run. It's also
+reachable any time from **Settings → Check the music service helper**.
+
+</details>
+
+<details>
+<summary><b>If a machine reports Python helper trouble</b></summary>
+
+<br>
+
+The helper is supervised: it's started on demand, restarted automatically if it
+ever stops, and the interrupted request is retried, so a one-off death is
+invisible. Anything it can't recover from leaves a trace in **`sidecar.log`**,
+in Melodia's app data folder (`%APPDATA%\com.melodia.app` on Windows).
+
+Melodia tries `python`, `python3` and `py` in turn, then the per-user locations
+the Windows installers use, and checks that each one *answers* rather than
+merely launching — so the Microsoft Store `python.exe` placeholder, and
+interpreters that are missing the packages, are skipped in favour of one that
+works. If none does, the error names each interpreter and why it was rejected.
+Installing Python fixes it without restarting the app.
+
+</details>
 
 ---
 
@@ -454,6 +507,7 @@ Melodia/
 │       ├── lib.rs          Entry point and command registration
 │       ├── commands.rs     Commands exposed to the frontend
 │       ├── sidecar.rs      Spawns and talks to the Python helper
+│       ├── python.rs       Detects Python and installs the helper's packages
 │       ├── playback.rs     Audio thread: fetch, decode, play, fades, devices
 │       ├── equalizer.rs    5-band graphic EQ
 │       ├── analyzer.rs     FFT tap feeding the visualizer

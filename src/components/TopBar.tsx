@@ -1,5 +1,5 @@
 import { ChevronLeft, ChevronRight, Search, Settings, X } from "lucide-react";
-import { AnimatePresence, motion } from "framer-motion";
+import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import { useLocation, useNavigate } from "react-router-dom";
 import { useEffect, useRef, useState } from "react";
 import { useAuthStore } from "../store/authStore";
@@ -8,12 +8,34 @@ import { useDiscordStore } from "../store/discordStore";
 const DEBOUNCE_MS = 350;
 const MIN_QUERY_LENGTH = 2;
 
+// The search prompt, cycled as an ambient touch. Decorative only — the app
+// itself isn't localised, so English leads and is what a screen reader gets.
+const SEARCH_PROMPTS = [
+  "What do you want to play?",
+  "¿Qué quieres reproducir?",
+  "Que voulez-vous écouter ?",
+  "Was möchtest du hören?",
+  "Cosa vuoi ascoltare?",
+  "O que você quer ouvir?",
+  "Что вы хотите послушать?",
+  "想听点什么？",
+  "何を聴きたいですか？",
+  "무엇을 듣고 싶으세요?",
+  "آپ کیا سننا چاہتے ہیں؟",
+  "आप क्या सुनना चाहते हैं?",
+];
+
+const PROMPT_INTERVAL_MS = 2000;
+
 export function TopBar() {
   const navigate = useNavigate();
   const location = useLocation();
   const [query, setQuery] = useState("");
   const [confirmingSignOut, setConfirmingSignOut] = useState(false);
+  const [promptIndex, setPromptIndex] = useState(0);
+  const [searchFocused, setSearchFocused] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
+  const reduceMotion = useReducedMotion();
   const authState = useAuthStore((s) => s.state);
   const openModal = useAuthStore((s) => s.openModal);
   const doSignOut = useAuthStore((s) => s.doSignOut);
@@ -52,6 +74,19 @@ export function TopBar() {
     }, DEBOUNCE_MS);
     return () => clearTimeout(id);
   }, [query, navigate]);
+
+  // Cycling stops once the box has focus: a phrase rotating under the caret is
+  // a moving target for someone who is about to type. It doesn't run at all for
+  // anyone who has asked for reduced motion, who gets the English prompt.
+  const cyclePrompts = !searchFocused && !query && !reduceMotion;
+  useEffect(() => {
+    if (!cyclePrompts) return;
+    const id = setInterval(
+      () => setPromptIndex((i) => (i + 1) % SEARCH_PROMPTS.length),
+      PROMPT_INTERVAL_MS,
+    );
+    return () => clearInterval(id);
+  }, [cyclePrompts]);
 
   // Leaving the search page cancels the search outright: drop any pending
   // navigation and empty the box, so a stale query can't pull the user back.
@@ -92,14 +127,54 @@ export function TopBar() {
       <form onSubmit={submitSearch} className="w-full max-w-md">
         <div className="flex items-center gap-3 rounded-full bg-surface-2 px-4 py-2.5 text-sm text-muted transition-colors focus-within:bg-surface-3 focus-within:ring-1 focus-within:ring-accent/40">
           <Search size={18} className="shrink-0" />
-          <input
-            ref={inputRef}
-            type="search"
-            value={query}
-            onChange={(e) => handleQueryChange(e.target.value)}
-            placeholder="What do you want to play?    /"
-            className="w-full bg-transparent text-fg outline-none placeholder:text-muted [&::-webkit-search-cancel-button]:hidden"
-          />
+          {/* The prompt is a sibling of the input rather than its `placeholder`,
+              which is an attribute and so can't be animated. It sits under the
+              (empty) input and ignores pointer events, so clicking it still
+              focuses the box exactly as a real placeholder would. */}
+          <div className="relative min-w-0 flex-1">
+            <input
+              ref={inputRef}
+              type="search"
+              value={query}
+              onChange={(e) => handleQueryChange(e.target.value)}
+              onFocus={() => setSearchFocused(true)}
+              onBlur={() => setSearchFocused(false)}
+              aria-label="Search"
+              className="relative w-full bg-transparent text-fg outline-none [&::-webkit-search-cancel-button]:hidden"
+            />
+            {!query && (
+              <div
+                aria-hidden
+                className="pointer-events-none absolute inset-0 flex items-center overflow-hidden"
+              >
+                <AnimatePresence mode="wait" initial={false}>
+                  <motion.span
+                    key={promptIndex}
+                    // Scripts run both ways here; without this, Urdu renders
+                    // with its punctuation on the wrong end. `text-left` then
+                    // puts the line back where every other language starts —
+                    // direction should order the glyphs, not move the prompt to
+                    // the far side of the pill every twelfth rotation.
+                    dir="auto"
+                    initial={{ opacity: 0, y: 9 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -9 }}
+                    transition={{ duration: 0.32, ease: "easeOut" }}
+                    className="block w-full truncate text-left text-muted"
+                  >
+                    {SEARCH_PROMPTS[promptIndex]}
+                  </motion.span>
+                </AnimatePresence>
+              </div>
+            )}
+          </div>
+          {/* Pinned to the pill instead of trailing the prompt, which would
+              shove it a different distance in every language. */}
+          {!query && (
+            <kbd className="shrink-0 rounded border border-fg/15 px-1.5 py-px text-[11px] leading-relaxed text-muted">
+              /
+            </kbd>
+          )}
           {query && (
             <button
               type="button"
