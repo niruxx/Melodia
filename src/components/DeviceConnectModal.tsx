@@ -41,7 +41,7 @@ export function DeviceConnectModal() {
 
             <h2 className="text-lg font-bold">Connect to a device</h2>
             <p className="mt-1 text-sm text-muted">
-              Play from other devices on your network running TuneBox.
+              Play from other devices on your network running Melodia.
             </p>
 
             {role === "controller" && connectedPeerName ? (

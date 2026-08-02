@@ -25,7 +25,7 @@ export function TitleBar() {
     >
       <div data-tauri-drag-region className="flex items-center gap-2 text-xs font-semibold text-muted">
         <AppIcon className="h-4 w-4 rounded-sm" />
-        TuneBox
+        Melodia
       </div>
 
       <div className="flex h-full items-stretch">

@@ -60,11 +60,11 @@ fn restore_main_window<R: Runtime>(app: &AppHandle<R>) {
 /// the window is hidden — the click handlers emit the same `media:*` events the
 /// OS media keys already use, so no new frontend wiring is needed.
 pub fn build_tray<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<()> {
-    let show = MenuItem::with_id(app, "tray_show", "Show TuneBox", true, None::<&str>)?;
+    let show = MenuItem::with_id(app, "tray_show", "Show Melodia", true, None::<&str>)?;
     let play_pause = MenuItem::with_id(app, "tray_play_pause", "Play / Pause", true, None::<&str>)?;
     let next = MenuItem::with_id(app, "tray_next", "Next", true, None::<&str>)?;
     let prev = MenuItem::with_id(app, "tray_prev", "Previous", true, None::<&str>)?;
-    let quit = MenuItem::with_id(app, "tray_quit", "Quit TuneBox", true, None::<&str>)?;
+    let quit = MenuItem::with_id(app, "tray_quit", "Quit Melodia", true, None::<&str>)?;
     let sep = PredefinedMenuItem::separator(app)?;
 
     let menu = Menu::with_items(
@@ -72,9 +72,9 @@ pub fn build_tray<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<()> {
         &[&show, &sep, &prev, &play_pause, &next, &sep, &quit],
     )?;
 
-    let mut builder = TrayIconBuilder::with_id("tunebox-tray")
+    let mut builder = TrayIconBuilder::with_id("melodia-tray")
         .menu(&menu)
-        .tooltip("TuneBox")
+        .tooltip("Melodia")
         // Windows convention: left-click restores, right-click opens the menu.
         .show_menu_on_left_click(false)
         .on_menu_event(|app, event| match event.id().as_ref() {

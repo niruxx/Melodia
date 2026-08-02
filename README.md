@@ -1,439 +1,515 @@
 <div align="center">
 
-# 🎵 TuneBox
+<img src="docs/branding/app-icon.png" alt="" width="120" />
 
-**A modern, cross-platform desktop client for YouTube Music.**
+# Melodia
 
-Built with 🦀 [Tauri](https://tauri.app), ⚛️ React + TypeScript, and 🎨 Tailwind CSS — inspired by Spotify's layout, styled as its own thing.
+**A desktop music player for your YouTube Music library — and your local files.**
 
-`v0.3.0` &nbsp;·&nbsp; shown in **Settings**, defined in [`src/lib/version.ts`](src/lib/version.ts)
+Real playback, your real playlists, and a UI you can make your own.
 
-![TuneBox — Home](docs/screenshot.png)
+<p>
+<img alt="Windows" src="https://img.shields.io/badge/Windows-tested-2ea44f?style=flat-square&logo=windows&logoColor=white" />
+<img alt="macOS" src="https://img.shields.io/badge/macOS-untested-8a8a8a?style=flat-square&logo=apple&logoColor=white" />
+<img alt="Linux" src="https://img.shields.io/badge/Linux-untested-8a8a8a?style=flat-square&logo=linux&logoColor=white" />
+</p>
+
+<p>
+<img alt="Version" src="https://img.shields.io/badge/version-0.5.0-7c5cff?style=flat-square" />
+<img alt="Tauri" src="https://img.shields.io/badge/Tauri-2-24C8DB?style=flat-square&logo=tauri&logoColor=white" />
+<img alt="React" src="https://img.shields.io/badge/React-19-61DAFB?style=flat-square&logo=react&logoColor=black" />
+<img alt="Rust" src="https://img.shields.io/badge/Rust-audio_engine-CE422B?style=flat-square&logo=rust&logoColor=white" />
+</p>
+
+<img src="docs/screenshot.png" alt="Melodia home screen" width="900" />
 
 </div>
 
+---
+
+## What is Melodia?
+
+Melodia signs in to your Google account and plays your **actual** YouTube Music
+library — your playlists, albums, history, and search. Audio is decoded natively
+in Rust rather than piped through a hidden browser tab, which is what makes the
+equalizer, the spectrum visualizer, and per-device audio output possible.
+
+It also plays music straight off your disk, so it works with no account at all.
+
+> [!NOTE]
+> Melodia is an independent project and is not affiliated with, endorsed by, or
+> connected to Google or YouTube.
+
+---
+
+## A look around
+
 <table>
 <tr>
-<td width="50%"><img src="docs/now-playing.png" alt="Fullscreen player with the spectrum visualizer and adaptive album-art theming" /></td>
+<td width="50%"><img src="docs/now-playing.png" alt="Fullscreen player" /></td>
 <td width="50%"><img src="docs/command-palette.png" alt="Command palette" /></td>
 </tr>
 <tr>
-<td align="center"><em>Fullscreen player — live spectrum visualizer, tinted by the album art</em></td>
-<td align="center"><em>Command palette (<kbd>Ctrl</kbd>+<kbd>K</kbd>)</em></td>
-</tr>
-<tr>
-<td colspan="2"><img src="docs/settings.png" alt="Settings panel" /></td>
-</tr>
-<tr>
-<td colspan="2" align="center"><em>Settings — background playback, local folder, fades, sleep timer, and the 5-band EQ</em></td>
+<td align="center"><b>Fullscreen player</b><br/><sub>Live spectrum visualizer, tinted by the album art</sub></td>
+<td align="center"><b>Command palette</b><br/><sub>Jump anywhere with <kbd>Ctrl</kbd>+<kbd>K</kbd></sub></td>
 </tr>
 </table>
 
-<!-- Additional captures. Uncomment each row once the file exists — see
-     docs/CAPTURE.md for the shot list, sizes, and how to record the GIF.
+<img src="docs/settings.png" alt="Settings" width="100%" />
 
-<p align="center"><img src="docs/demo.gif" alt="TuneBox in motion" width="900" /></p>
-<p align="center"><em>Browsing, playing, and theming</em></p>
+<div align="center"><sub><b>Settings</b> — audio output, quality, equalizer, themes, and more</sub></div>
+
+<!-- More captures. Uncomment a row once the file exists — docs/CAPTURE.md has
+     the shot list, sizes, and how to record the GIF.
+
+<p align="center"><img src="docs/demo.gif" alt="Melodia in motion" width="900" /></p>
+<p align="center"><sub>Browsing, playing, and re-theming on the fly</sub></p>
 
 <table>
 <tr>
-<td width="50%"><img src="docs/themes.png" alt="Theme picker" /></td>
-<td width="50%"><img src="docs/comments.png" alt="YouTube comments panel" /></td>
+<td width="50%"><img src="docs/themes.png" alt="Themes" /></td>
+<td width="50%"><img src="docs/comments.png" alt="Comments" /></td>
 </tr>
 <tr>
-<td align="center"><em>Six app themes, custom accents, and visualizer palettes</em></td>
-<td align="center"><em>Per-song YouTube comments</em></td>
-</tr>
-<tr>
-<td width="50%"><img src="docs/setup-wizard.png" alt="First-run setup" /></td>
-<td width="50%"><img src="docs/mini-player.png" alt="Mini player" /></td>
-</tr>
-<tr>
-<td align="center"><em>First-run setup — theme, audio output, sign-in</em></td>
-<td align="center"><em>Mini player with the mirrored visualizer</em></td>
+<td align="center"><b>Themes</b><br/><sub>Six palettes, custom accents, visualizer colours</sub></td>
+<td align="center"><b>Comments</b><br/><sub>Read a song's YouTube comments without leaving</sub></td>
 </tr>
 </table>
 -->
 
 ---
 
-## ✨ Features
+## Features
 
-- 🖤 **Modern, Spotify-inspired UI** — dark, dense two-panel sidebar, card grids, a full-width Now Playing bar, and a fullscreen "now playing" view
-- 🔊 **Real audio playback** — actual songs stream and play, decoded natively in Rust, not simulated
-- 🔐 **One-click Google sign-in** — sign in through Google's own page in an app window; no Google Cloud project, client ID, or secret needed. A device-code OAuth flow remains available as a fallback.
-- 📚 **Real library sync** — your actual playlists, albums, home feed, recently played, and search, pulled live from your account
-- 💿 **Local music folder** — a "Local" tab plays songs straight off your disk (title/artist/album/art read from file tags), alongside YouTube Music, switchable any time
-- 🎚️ **Fade in / out & 5-band equalizer** — smooth volume ramps on play/pause/stop, plus a graphic EQ (60Hz–12kHz) with eight presets (Bass boost, Vocal, Rock, Podcast, …)
-- 🎨 **Adaptive album-art theming** — dominant colours are extracted from the current artwork and the whole UI re-tints to match, transitioning smoothly between tracks
-- 🖌️ **Full theme system** — six app palettes (Midnight, Graphite, Nocturne, Forest, Ember, Daylight), a custom accent picker, an ambient background wash that drifts with the artwork, and separate visualizer palettes
-- 📊 **Real-time spectrum visualizer** — a live FFT-driven analyzer in the fullscreen player and mini window, with themeable colours and a mirrored variant
-- ✏️ **Playlist management** — create, rename, edit details and visibility, delete, add/remove songs, and drag to reorder, all synced to your account
-- 💬 **Per-song YouTube comments** — a side panel showing the current track's comments, sorted by top or newest, with replies
-- 🎬 **Music video mode** — play the track's music video in place of the artwork, synced to the audio engine so the EQ, visualizer and output routing all keep working
-- 🔗 **Share links** — copy a `music.youtube.com` link for any song, playlist or album straight to your clipboard
-- 🔈 **Output device selection** — send audio to a specific pair of speakers, headphones or DAC instead of the system default
-- 📶 **Streaming quality** — choose Best / Balanced / Data saver; local FLAC, ALAC, WAV and AIFF play losslessly
-- 🧭 **First-run setup** — a short guided wizard for theme, audio output, and sign-in, replayable any time from Settings
-- ⌨️ **Full keyboard control** — space/arrows/`M`/`L`/`S`/`R`/`F`/`Q`, `/` to search, and `?` for a shortcuts cheatsheet
-- ⚡ **Command palette** — `Ctrl/Cmd+K` fuzzy-jumps to any song, album, playlist, or action
-- 🖱️ **Right-click menus & drag-to-reorder** — Play next, Add to queue, Like, Copy; drag queue items to reorder them
-- 🎧 **Background playback** — optionally close the window to the system tray and keep the music going, with play/pause/next/previous right in the tray menu
-- 🌙 **Sleep timer** — fades out and pauses after 15/30/45/60 minutes
-- 🪄 **Mini player** — a compact, always-on-top window for when you just need the controls
-- ⏯️ **OS media keys** — play/pause, next, and previous work from your keyboard's media keys
-- 💚 **Liked Songs** — a dedicated, always-pinned playlist for anything you heart
-- 📝 **Lyrics** — fetched live and shown in the fullscreen player
-- 🎮 **Discord Rich Presence** — optionally show what you're listening to on your Discord profile
-- 📡 **Connect to a device** — control playback on another device running TuneBox on your local network (Spotify-Connect-style): pick a device, and playback moves there until you disconnect
-- 🪟 **Custom titlebar** — no native window chrome; a slim, draggable, themed titlebar with its own window controls
-- 🧩 **Cross-platform** — one codebase targets Windows, macOS, and Linux
+<table>
+<tr><td width="33%" valign="top">
 
----
+### 🎵 Playing music
 
-## 🧱 Tech Stack
+- Your real playlists, albums, history and search
+- Local folder playback with tag reading
+- Gapless-feeling fades on play, pause and stop
+- Queue with drag-to-reorder
+- Sleep timer
+- Background playback from the system tray
 
-| Layer | Technology |
-|---|---|
-| Desktop shell | [Tauri 2](https://tauri.app) (Rust core + native OS webview) |
-| Frontend | React 19 + TypeScript + Vite |
-| Styling | Tailwind CSS v4 |
-| State | Zustand |
-| Motion | Framer Motion |
-| Icons | lucide-react |
-| YouTube Music data | [ytmusicapi](https://github.com/sigma67/ytmusicapi) via a small Python sidecar process |
-| Rich Presence | [discord-rich-presence](https://github.com/vionya/discord-rich-presence) (Rust) |
-| LAN device discovery | [mdns-sd](https://github.com/keepsimple1/mdns-sd) (Rust) |
-| Audio playback | [rodio](https://github.com/RustAudio/rodio) + [reqwest](https://github.com/seanmonstar/reqwest) (Rust) |
-| Decoding | [Symphonia](https://github.com/pdeljanov/Symphonia) via rodio — AAC, MP3, Vorbis, FLAC, ALAC, WAV, AIFF |
-| Output device enumeration | [cpal](https://github.com/RustAudio/cpal) (re-exported by rodio) |
-| Audio & video stream resolution | [yt-dlp](https://github.com/yt-dlp/yt-dlp) via the Python sidecar |
-| Comments | yt-dlp's InnerTube extractor, on a worker thread |
-| Local file tag reading | [lofty](https://github.com/Serial-ATA/lofty-rs) + [walkdir](https://github.com/BurntSushi/walkdir) (Rust) |
-| Spectrum analysis | [rustfft](https://github.com/ejmahler/RustFFT) (Rust) |
-| Album-art colour extraction | [image](https://github.com/image-rs/image) (Rust) |
-| Folder picker / media keys | [tauri-plugin-dialog](https://github.com/tauri-apps/plugins-workspace), [tauri-plugin-global-shortcut](https://github.com/tauri-apps/plugins-workspace) |
-| Typeface | [Inter](https://rsms.me/inter/) (bundled via `@fontsource-variable/inter`) |
+</td><td width="33%" valign="top">
 
----
+### 🎛️ Sound
 
-## 💻 OS Support
+- 5-band equalizer with 8 presets
+- Pick your output device
+- Streaming quality: Best / Balanced / Data saver
+- Lossless local playback — FLAC, ALAC, WAV, AIFF
+- OS media keys
 
-One codebase targets all three desktop platforms. Being straight about what's actually been exercised:
+</td><td width="33%" valign="top">
 
-| OS | Minimum | Status |
-|---|---|---|
-| 🪟 **Windows** | 10 (1803+) / 11, x64 | ✅ **Developed and tested here.** Audio uses WASAPI; the UI renders in WebView2. |
-| 🍎 **macOS** | 11 Big Sur+, Intel & Apple Silicon | ⚠️ **Builds not yet run.** No platform-specific code stands in the way — WKWebView and CoreAudio are used through Tauri and cpal — but it's unverified. |
-| 🐧 **Linux** | glibc-based, X11 | ⚠️ **Builds not yet run.** Needs WebKitGTK 4.1 and ALSA (see below). Tray icons and global media keys depend on X11, so Wayland sessions may not pick them up. |
+### 🎨 Making it yours
 
-Platform-specific behaviour worth knowing:
+- Six app themes, plus a custom accent
+- Ambient background that drifts with the artwork
+- Themeable spectrum visualizer
+- Mini player that stays on top
+- Guided first-run setup
 
-- **Windows** — the Python helper is launched with `CREATE_NO_WINDOW`, so no console flashes alongside the app.
-- **macOS** — hiding to the tray leaves the app in the Dock, and clicking the Dock icon won't restore the window; use the tray item.
-- **All** — the custom titlebar uses the same right-aligned window controls everywhere rather than native macOS traffic lights.
+</td></tr>
+<tr><td valign="top">
+
+### 📚 Your library
+
+- Create, rename and delete playlists
+- Add, remove and reorder songs
+- Liked Songs, always pinned
+- Lyrics in the fullscreen player
+- Copy a share link for any song or playlist
+
+</td><td valign="top">
+
+### ⚡ Getting around
+
+- Command palette (<kbd>Ctrl</kbd>+<kbd>K</kbd>)
+- Full keyboard control, <kbd>?</kbd> for the list
+- Right-click menus everywhere
+- Read a track's YouTube comments in-app
+
+</td><td valign="top">
+
+### 🔗 Connected
+
+- Discord Rich Presence
+- Play on another device on your network
+- One-click Google sign-in — no API keys
+
+</td></tr>
+</table>
 
 ---
 
-## 📋 Prerequisites
+## Getting started
 
-Common to every platform:
-
-- 🟢 **[Node.js](https://nodejs.org/)** (v18+) and npm
-- 🦀 **[Rust](https://www.rust-lang.org/tools/install)** (via `rustup`)
-- 🐍 **[Python 3](https://www.python.org/)** + pip — powers the YouTube Music sidecar
-
-Then the platform-specific build dependencies:
-
-<details open>
-<summary><strong>🪟 Windows</strong></summary>
-
-<br>
-
-Install [Microsoft C++ Build Tools](https://visualstudio.microsoft.com/visual-cpp-build-tools/) with the **"Desktop development with C++"** workload — Rust needs it to link. WebView2 ships with Windows 10/11; on older builds install the [Evergreen runtime](https://developer.microsoft.com/microsoft-edge/webview2/).
-
-</details>
-
-<details>
-<summary><strong>🍎 macOS</strong></summary>
-
-<br>
+You'll need **[Node.js](https://nodejs.org/) 18+**, **[Rust](https://www.rust-lang.org/tools/install)**,
+and **[Python 3](https://www.python.org/)**. Platform build tools are listed
+[below](#platform-requirements).
 
 ```bash
-xcode-select --install          # Apple's command line tools
-brew install python            # if you don't already have python3
+git clone https://github.com/niruxx/Melodia.git
+cd Melodia
+
+npm install                              # frontend dependencies
+pip install -r sidecar/requirements.txt  # YouTube Music helper
+
+npm run tauri dev                        # run it
 ```
 
-Everything else TuneBox needs is provided by the system: WKWebView for the UI and CoreAudio for playback.
-
-</details>
-
-<details>
-<summary><strong>🐧 Linux</strong></summary>
-
-<br>
-
-**Debian / Ubuntu:**
-
-```bash
-sudo apt update
-sudo apt install -y   build-essential curl wget file   libwebkit2gtk-4.1-dev librsvg2-dev libssl-dev   libayatana-appindicator3-dev libxdo-dev   libasound2-dev   python3 python3-pip
-```
-
-**Fedora:**
-
-```bash
-sudo dnf install -y   @development-tools webkit2gtk4.1-devel librsvg2-devel openssl-devel   libappindicator-gtk3-devel libxdo-devel   alsa-lib-devel   python3 python3-pip
-```
-
-**Arch:**
-
-```bash
-sudo pacman -S --needed   base-devel webkit2gtk-4.1 librsvg openssl   libayatana-appindicator xdotool   alsa-lib   python python-pip
-```
-
-Why each of the less obvious ones is needed:
-
-| Package | Needed for |
-|---|---|
-| `libwebkit2gtk-4.1` | the webview Tauri renders the UI in |
-| `libasound2` / `alsa-lib` | audio output — `rodio`/`cpal` build against ALSA |
-| `libayatana-appindicator3` | the system tray icon used by background playback |
-| `libxdo` / `xdotool` | tray and global-shortcut support on X11 |
-| `libssl` / `openssl` | HTTPS, via `reqwest`'s native-TLS backend |
-
-</details>
-
----
-
-## 🚀 Getting Started
-
-```bash
-# 1. Clone the repo
-git clone <this-repo-url>
-cd TuneBox
-
-# 2. Install frontend dependencies
-npm install
-
-# 3. Install the Python sidecar's dependencies
-pip install -r sidecar/requirements.txt
-
-# 4. Launch the app in dev mode (hot-reloading)
-npm run tauri dev
-```
-
-To build a production binary and installers:
+To produce installers instead:
 
 ```bash
 npm run tauri build
 ```
 
-Tauri only builds for the machine it runs on — there's no cross-compiling here, so build each platform on that platform. Output lands in `src-tauri/target/release/bundle/`:
+Artifacts land in `src-tauri/target/release/bundle/`:
 
-| Platform | Artifacts |
+| Platform | You get |
 |---|---|
-| 🪟 Windows | `msi/*.msi`, `nsis/*-setup.exe` |
-| 🍎 macOS | `dmg/*.dmg`, `macos/*.app` |
-| 🐧 Linux | `deb/*.deb`, `rpm/*.rpm`, `appimage/*.AppImage` |
+| Windows | `.msi` and an NSIS `.exe` installer |
+| macOS | `.dmg` and `.app` |
+| Linux | `.deb`, `.rpm` and `.AppImage` |
 
-> **Python is a runtime requirement, not just a build one.** The bundle ships `sidecar/main.py` as a resource, but the machine running TuneBox still needs Python 3 on `PATH` plus the packages from `sidecar/requirements.txt`. TuneBox looks for `python3` first and falls back to `python` (and `py` on Windows).
+Tauri builds only for the machine it runs on — there's no cross-compiling, so
+each platform must be built on that platform.
+
+> [!IMPORTANT]
+> **Python is needed to run Melodia, not just to build it.** The installer
+> bundles the helper script, but the machine still needs Python 3 on `PATH`
+> plus the packages in `sidecar/requirements.txt`.
 
 ---
 
-## 🔑 Connecting Your YouTube Music Account
-
-### Sign in with Google (default)
-
-1. Click **Connect YouTube Music** on the Home screen (or the account icon in the top bar)
-2. Hit **Sign in with Google** — a window opens on Google's real sign-in page
-3. Log in as you normally would
-
-That's it. TuneBox detects the finished session, verifies it, and loads your playlists, library, recently played, and search. **No Google Cloud project, no client ID, no client secret.**
-
-Under the hood it captures your YouTube session cookie; `ytmusicapi` derives the required `SAPISIDHASH` authorization header from it on every request. The cookie is verified against your account before anything is saved, so a half-finished login can't leave the app in a broken "signed in" state. It's stored in the app's data directory and cleared on sign-out.
-
-> **Note:** cookie sessions expire eventually (typically weeks) and are invalidated by a password change, so you'll occasionally need to sign in again. TuneBox re-checks the session at startup and prompts you if it has lapsed.
+## Platform requirements
 
 <details>
-<summary><strong>🔁 Fallback: sign in with your own Google OAuth client</strong></summary>
+<summary><b>Windows</b></summary>
 
 <br>
 
-If the Google window doesn't work for you, click **"Having trouble? Use the OAuth client method instead"** in the sign-in dialog. This is the original device-code flow and needs a free OAuth client of your own:
+Install [Microsoft C++ Build Tools](https://visualstudio.microsoft.com/visual-cpp-build-tools/)
+with the **Desktop development with C++** workload — Rust needs it to link.
 
-1. Go to the [Google Cloud Console](https://console.cloud.google.com/) and create a project (or reuse one)
-2. Under **APIs & Services → OAuth consent screen**, configure it (External + Testing is fine for personal use)
-3. Under **APIs & Services → Credentials**, choose **Create Credentials → OAuth client ID**
-4. Pick application type **"TVs and Limited Input devices"**
-5. Paste the **Client ID** and **Client Secret** into TuneBox, then hit **Get a code**
-6. Open the link shown, enter the code, and approve access
+WebView2 ships with Windows 10 and 11. On older builds, install the
+[Evergreen runtime](https://developer.microsoft.com/microsoft-edge/webview2/).
 
-OAuth sessions refresh silently, so this method needs re-authentication less often.
+</details>
+
+<details>
+<summary><b>macOS</b></summary>
+
+<br>
+
+```bash
+xcode-select --install   # Apple's command line tools
+brew install python      # if you don't already have python3
+```
+
+Everything else comes with the system — WKWebView for the UI, CoreAudio for
+playback.
+
+</details>
+
+<details>
+<summary><b>Linux</b></summary>
+
+<br>
+
+**Debian / Ubuntu**
+
+```bash
+sudo apt update
+sudo apt install -y build-essential curl wget file \
+  libwebkit2gtk-4.1-dev librsvg2-dev libssl-dev \
+  libayatana-appindicator3-dev libxdo-dev \
+  libasound2-dev python3 python3-pip
+```
+
+**Fedora**
+
+```bash
+sudo dnf install -y @development-tools webkit2gtk4.1-devel librsvg2-devel \
+  openssl-devel libappindicator-gtk3-devel libxdo-devel \
+  alsa-lib-devel python3 python3-pip
+```
+
+**Arch**
+
+```bash
+sudo pacman -S --needed base-devel webkit2gtk-4.1 librsvg openssl \
+  libayatana-appindicator xdotool alsa-lib python python-pip
+```
+
+What the less obvious ones are for:
+
+| Package | Needed for |
+|---|---|
+| `libwebkit2gtk-4.1` | the webview the UI renders in |
+| `libasound2` / `alsa-lib` | audio output — rodio/cpal build against ALSA |
+| `libayatana-appindicator3` | the tray icon used by background playback |
+| `libxdo` / `xdotool` | tray and global shortcuts on X11 |
+| `libssl` / `openssl` | HTTPS |
 
 </details>
 
 ---
 
-## 💿 Playing Local Files
+## Signing in
 
-TuneBox can also play music straight from a folder on your computer, no YouTube Music account needed:
+1. Click **Connect YouTube Music**
+2. Click **Sign in with Google** — Google's real sign-in page opens in a window
+3. Log in as normal
 
-1. Click the ⚙️ **gear icon** in the top bar, and under **Local music folder**, click **Choose folder…**
-2. TuneBox scans it (recursively) for `.mp3`, `.m4a`, `.aac`, `.flac`, `.wav`, and `.ogg` files, reading title/artist/album/cover art from each file's tags (falling back to the filename and folder name when tags are missing)
-3. Switch to the **Local** tab at the top of the sidebar to browse and play
+That's it. No Google Cloud project, no client ID, no API keys. Melodia captures
+the resulting session cookie, verifies it against your account before saving
+anything, and loads your library.
+
+> [!TIP]
+> Cookie sessions last weeks, not forever, and a password change ends them.
+> Melodia re-checks at startup and prompts you if yours has lapsed.
+
+<details>
+<summary><b>Fallback: use your own Google OAuth client</b></summary>
+
+<br>
+
+If the Google window doesn't work for you, choose **"Having trouble? Use the
+OAuth client method instead"** in the sign-in dialog:
+
+1. In the [Google Cloud Console](https://console.cloud.google.com/), create a project
+2. Configure **APIs & Services → OAuth consent screen** (External + Testing is fine)
+3. Under **Credentials**, create an **OAuth client ID**
+4. Choose application type **TVs and Limited Input devices**
+5. Paste the Client ID and Secret into Melodia, then **Get a code**
+
+OAuth sessions refresh silently, so this needs re-authenticating less often.
+
+</details>
 
 ---
 
-## 🎧 Background Playback
+## Everyday use
 
-By default, closing the window quits TuneBox. To keep music playing instead:
+<details>
+<summary><b>Playing local files</b></summary>
 
-1. Open ⚙️ **Settings**
-2. Turn **Keep playing in the background** on
+<br>
 
-Closing the window now hides it to the system tray rather than quitting. The tray icon gives you:
+1. Open **Settings** → **Local music folder** → **Choose folder…**
+2. Melodia scans it for `.mp3`, `.m4a`, `.aac`, `.flac`, `.wav` and `.ogg`,
+   reading title, artist, album and cover art from each file's tags
+3. Switch to the **Local** tab in the sidebar
 
-- **Left-click** — bring the window back
-- **Right-click** — Show TuneBox, Previous / Play-Pause / Next, and **Quit TuneBox**
+Lossless formats play bit-for-bit — no re-encoding.
 
-Quitting from the tray is the way to actually exit while this is enabled. The setting is remembered between launches, and playback continues uninterrupted because the audio engine runs on its own thread independent of the window.
+</details>
 
----
+<details>
+<summary><b>Keeping music playing when you close the window</b></summary>
 
-## ⌨️ Keyboard Shortcuts
+<br>
 
-Press <kbd>?</kbd> anywhere in the app for the full list. The essentials:
+Turn on **Keep playing in the background** in Settings. Closing the window then
+hides it to the tray instead of quitting.
+
+- **Left-click** the tray icon to bring the window back
+- **Right-click** for Previous / Play-Pause / Next, and **Quit**
+
+Quitting from the tray is how you actually exit while this is on.
+
+</details>
+
+<details>
+<summary><b>Discord Rich Presence</b></summary>
+
+<br>
+
+Open Settings and click **Enable**, with Discord desktop running. Your presence
+updates as tracks change.
+
+This isn't a bot — nothing is added to any server. Discord's protocol just needs
+an Application ID in its handshake, which Melodia supplies from
+`src/lib/discordConfig.ts`.
+
+**Maintainers:** that file ships with a placeholder. Create an application in the
+[Discord Developer Portal](https://discord.com/developers/applications) and paste
+its Application ID in to make presence work in your build.
+
+</details>
+
+<details>
+<summary><b>Keyboard shortcuts</b></summary>
+
+<br>
+
+Press <kbd>?</kbd> in the app for the full list.
 
 | Key | Action |
 |---|---|
 | <kbd>Space</kbd> | Play / pause |
 | <kbd>←</kbd> <kbd>→</kbd> | Seek 5 seconds |
-| <kbd>Shift</kbd> + <kbd>←</kbd>/<kbd>→</kbd> | Previous / next track |
+| <kbd>Shift</kbd> + <kbd>←</kbd> / <kbd>→</kbd> | Previous / next track |
 | <kbd>↑</kbd> <kbd>↓</kbd> | Volume |
-| <kbd>M</kbd> / <kbd>L</kbd> | Mute / like current song |
-| <kbd>S</kbd> / <kbd>R</kbd> | Shuffle / repeat mode |
+| <kbd>M</kbd> / <kbd>L</kbd> | Mute / like |
+| <kbd>S</kbd> / <kbd>R</kbd> | Shuffle / repeat |
 | <kbd>F</kbd> / <kbd>Q</kbd> | Fullscreen player / queue |
 | <kbd>/</kbd> | Focus search |
 | <kbd>Ctrl</kbd>+<kbd>K</kbd> | Command palette |
 | <kbd>Esc</kbd> | Close the topmost overlay |
 
-Your keyboard's dedicated media keys (play/pause, next, previous) also control TuneBox while it's running.
-
----
-
-## 🎮 Discord Rich Presence (optional)
-
-Show your currently playing song on your Discord profile. No per-user setup — just:
-
-1. Click the ⚙️ **gear icon** in the top bar
-2. Click **Enable**
-3. Make sure Discord desktop is running — your presence will update automatically as you play tracks
-
-This isn't a bot — no bot token, no server permissions, nothing gets added anywhere. Discord's Rich Presence protocol just requires *some* Application ID in its connection handshake so it knows whose name/icon to show, so TuneBox ships with its own, defined in `src/lib/discordConfig.ts`.
-
-<details>
-<summary><strong>📖 Maintainers: providing TuneBox's Discord Application ID</strong></summary>
-
-<br>
-
-`src/lib/discordConfig.ts` ships with a placeholder `DISCORD_APP_ID`. To make Rich Presence work in your build:
-
-1. Go to the [Discord Developer Portal](https://discord.com/developers/applications)
-2. Click **New Application**, name it "TuneBox" (or anything you like) — takes under a minute, no approval needed
-3. Copy the **Application ID** from the General Information tab and paste it into `DISCORD_APP_ID`
-
-Every end user then just sees the plain Enable toggle above — nobody else needs to touch this.
+Your keyboard's media keys work too.
 
 </details>
 
 ---
 
-## 🎨 Design System
+## Platform support
 
-The UI is built from a small set of shared primitives so pages can't visually drift apart. Worth knowing before adding screens:
+| OS | Minimum | Status |
+|---|---|---|
+| **Windows** | 10 (1803+) / 11, x64 | ✅ Developed and tested here |
+| **macOS** | 11 Big Sur+, Intel & Apple Silicon | ⚠️ Should work, but builds haven't been run |
+| **Linux** | glibc-based, X11 | ⚠️ Should work, but builds haven't been run |
 
-**Tokens** (`src/index.css`) — colours are `@theme` custom properties (`bg-base`, `bg-surface`/`-2`/`-3`, `text-fg`, `text-muted`, `bg-accent`). Two of them, `--accent-dynamic-1/-2`, are registered with `@property` so they can *animate*; the theme store rewrites them per track from album-art colours, and the whole UI transitions to match.
+Nothing in the code blocks macOS or Linux, and every dependency is
+cross-platform — it simply hasn't been verified there yet. Two known rough
+edges if you try:
 
-**Shared components** — reuse these rather than re-styling:
+- **macOS** — hiding to the tray leaves the app in the Dock, and the Dock icon
+  won't restore the window. Use the tray item.
+- **Linux** — the tray and media keys rely on X11, so Wayland sessions may not
+  pick them up.
+
+---
+
+## Known limitations
+
+Worth knowing before you install:
+
+| | |
+|---|---|
+| **No lossless streaming** | YouTube Music's best is ~256 kbps AAC. Its higher-bitrate Opus streams use a codec the player can't decode, so streams are always AAC. Lossless applies to local files only. |
+| **Music video mode doesn't work yet** | The stream resolves correctly but doesn't render in the app. Under investigation. |
+| **Installers are unsigned** | Windows SmartScreen will warn on first run. There's no auto-update channel. |
+| **Comments are read-only** | Posting would need a separate Google API and OAuth scopes. |
+| **Tracks buffer before playing** | Roughly 1.5s before audio starts, rather than true progressive streaming. Simpler and more robust; skipping stays responsive because fetching happens off the main thread. |
+| **Sign-in expires** | Cookie sessions last weeks. The OAuth fallback lasts longer. |
+| **Local tracks can't be cast** | "Play on another device" is YouTube-only — the other device doesn't have your file. |
+| **Screenshots are out of date** | They predate the theme system and ambient background. See [docs/CAPTURE.md](docs/CAPTURE.md). |
+| **LAN control is unencrypted** | Beyond the on-device Accept prompt there's no auth. Fine at home; not for untrusted networks. |
+
+---
+
+## For developers
+
+<details>
+<summary><b>Tech stack</b></summary>
+
+<br>
+
+| Layer | Technology |
+|---|---|
+| Desktop shell | [Tauri 2](https://tauri.app) — Rust core + native OS webview |
+| Frontend | React 19, TypeScript, Vite |
+| Styling | Tailwind CSS v4 |
+| State | Zustand |
+| Motion | Framer Motion |
+| Icons | lucide-react |
+| YouTube Music data | [ytmusicapi](https://github.com/sigma67/ytmusicapi) via a Python sidecar |
+| Stream & video resolution | [yt-dlp](https://github.com/yt-dlp/yt-dlp) via the same sidecar |
+| Audio playback | [rodio](https://github.com/RustAudio/rodio) + [reqwest](https://github.com/seanmonstar/reqwest) |
+| Decoding | [Symphonia](https://github.com/pdeljanov/Symphonia) — AAC, MP3, Vorbis, FLAC, ALAC, WAV, AIFF |
+| Output devices | [cpal](https://github.com/RustAudio/cpal) |
+| Spectrum analysis | [rustfft](https://github.com/ejmahler/RustFFT) |
+| Album-art colours | [image](https://github.com/image-rs/image) |
+| Local file tags | [lofty](https://github.com/Serial-ATA/lofty-rs) + [walkdir](https://github.com/BurntSushi/walkdir) |
+| Rich Presence | [discord-rich-presence](https://github.com/vionya/discord-rich-presence) |
+| LAN discovery | [mdns-sd](https://github.com/keepsimple1/mdns-sd) |
+| Typeface | [Inter](https://rsms.me/inter/) |
+
+</details>
+
+<details>
+<summary><b>Project structure</b></summary>
+
+<br>
+
+```
+Melodia/
+├── src/                    React frontend
+│   ├── assets/             App icon used by in-app branding
+│   ├── components/         UI components and shared primitives
+│   ├── pages/              Route pages (Home, Search, Library, Playlist, …)
+│   ├── store/              Zustand stores (player, auth, library, themes, …)
+│   ├── lib/                Types, formatters, share links, storage migration
+│   └── hooks/              Keyboard shortcuts, media keys, context menus
+├── src-tauri/              Rust backend
+│   └── src/
+│       ├── lib.rs          Entry point and command registration
+│       ├── commands.rs     Commands exposed to the frontend
+│       ├── sidecar.rs      Spawns and talks to the Python helper
+│       ├── playback.rs     Audio thread: fetch, decode, play, fades, devices
+│       ├── equalizer.rs    5-band graphic EQ
+│       ├── analyzer.rs     FFT tap feeding the visualizer
+│       ├── artwork.rs      Album-art colour extraction
+│       ├── google_login.rs Sign-in window and cookie capture
+│       ├── background.rs   Tray icon and close-to-tray
+│       ├── network.rs      LAN device discovery and control
+│       ├── discord.rs      Rich Presence IPC
+│       └── local_library.rs Local folder scan and tag reading
+└── sidecar/
+    └── main.py             JSON-over-stdio bridge to ytmusicapi + yt-dlp
+```
+
+</details>
+
+<details>
+<summary><b>Design system</b></summary>
+
+<br>
+
+The UI is built from shared primitives so pages can't drift apart.
+
+**Tokens** (`src/index.css`) — colours are `@theme` custom properties
+(`bg-base`, `bg-surface`/`-2`/`-3`, `text-fg`, `text-muted`, `bg-accent`).
+`--accent-dynamic-1/-2` are registered with `@property` so they can *animate*;
+the theme store rewrites them per track from album-art colours. The app theme
+overwrites the same tokens at runtime, which is how re-skinning works without
+touching components.
+
+**Reuse these rather than re-styling:**
 
 | Component | Use for |
 |---|---|
-| `PlayControls` | The play + shuffle pair atop every collection page |
-| `TrackList` / `TrackRow` | Any list of songs (staggered entrance + right-click menu included) |
-| `Skeleton` & friends | Loading placeholders — never a bare spinner for content |
-| `Marquee` | Track titles that may overflow |
+| `PlayControls` | The play + shuffle pair atop collection pages |
+| `TrackList` / `TrackRow` | Any list of songs |
+| `Skeleton` | Loading placeholders — never a bare spinner |
+| `Marquee` | Titles that may overflow |
 | `PlayingBars` | The "this is playing" indicator |
-| `ContextMenu` / `toast` | Right-click menus and transient confirmations |
+| `ContextMenu` / `toast` | Right-click menus and confirmations |
+| `AppIcon` | Anywhere the app identifies itself |
 
 **Conventions**
 
-- Range inputs use `.tb-range` (thumb reveals on hover). Add `.tb-range-always` when the thumb *is* the readout, like the EQ.
-- Detail pages (Playlist, Liked Songs, Recently Played) share one hero: large artwork tile, uppercase eyebrow, `text-3xl sm:text-4xl` title, count line. Index pages (Home, Library, Search) use a plain `text-2xl` heading.
-- Cards are `rounded-lg`; their skeletons must match, or content visibly shifts on load.
-- Interactions use Framer Motion `whileHover`/`whileTap`, not CSS `hover:scale-*`.
-- Empty states are left-aligned `text-muted` paragraphs, in line with the content above them.
-- Overlay stacking: drawer `40` → modals `50` → incoming request `60` → shortcuts `65` → command palette `68` → context menu `70`.
-- Every animation is covered by the global `prefers-reduced-motion` guard.
+- Range inputs use `.tb-range`; add `.tb-range-always` when the thumb *is* the readout, like the EQ
+- Detail pages share one hero: large artwork tile, uppercase eyebrow, `text-3xl sm:text-4xl` title, count line
+- Cards are `rounded-lg`, and their skeletons must match or content shifts on load
+- Interactions use Framer Motion `whileHover`/`whileTap`, not CSS `hover:scale-*`
+- Overlay stacking: drawer `40` → modals `50` → incoming request `60` → shortcuts `65` → palette `68` → context menu `70`
+- Every animation is covered by the global `prefers-reduced-motion` guard
+
+</details>
 
 ---
 
-## 📁 Project Structure
+## Thanks
 
-```
-TuneBox/
-├── src/                    # React frontend
-│   ├── assets/             # App icon used by in-app branding
-│   ├── components/         # UI components + shared primitives:
-│   │                        #   PlayControls, TrackList, Skeleton, Marquee,
-│   │                        #   PlayingBars, ContextMenu, Toaster, CommandPalette,
-│   │                        #   Visualizer, MiniPlayer, PageTransition, AppIcon,
-│   │                        #   SetupWizard, ThemeSettings, CommentsDrawer,
-│   │                        #   VideoLayer, PlaylistFormModal, AddToPlaylistModal
-│   ├── pages/               # Route pages (Home, Search, Library, Playlist, ...)
-│   ├── store/               # Zustand stores (player, auth, library, discord,
-│   │                        #   theme, uiTheme, visualizer, source, localLibrary,
-│   │                        #   audioSettings, comments, video, setup, toast,
-│   │                        #   contextMenu, ui, miniPlayer)
-│   ├── lib/                 # Types, formatters, fuzzy matcher, share links, version
-│   └── hooks/               # useKeyboardShortcuts, useMediaKeys, useTrackContextMenu
-├── src-tauri/              # Rust backend
-│   └── src/
-│       ├── lib.rs           # App entry point, command registration
-│       ├── commands.rs      # Tauri commands exposed to the frontend
-│       ├── sidecar.rs       # Spawns/talks to the Python sidecar over stdio
-│       ├── discord.rs       # Discord Rich Presence IPC client
-│       ├── network.rs       # LAN device discovery + control (mDNS + TCP)
-│       ├── playback.rs      # Dedicated audio thread: fetch, decode, play, fades
-│       ├── equalizer.rs     # 5-band graphic EQ (custom rodio Source wrapper)
-│       ├── analyzer.rs      # FFT spectrum tap feeding the visualizer
-│       ├── artwork.rs       # Album-art dominant-colour extraction
-│       ├── google_login.rs  # Google sign-in window + session cookie capture
-│       ├── background.rs    # Tray icon + close-to-tray background mode
-│       └── local_library.rs # Local folder scan + tag reading (lofty)
-└── sidecar/                # Python sidecar
-    └── main.py               # stdin/stdout JSON bridge around ytmusicapi + yt-dlp
-```
-
----
-
-## 🗺️ Roadmap / Known Limitations
-
-- 📦 **Installers are unsigned** — `npm run tauri build` does produce a Windows `.msi` and an NSIS `.exe` installer, but they aren't code-signed and there's no auto-update channel, so Windows SmartScreen will warn on first run.
-- 🍎 **One titlebar style everywhere** — the custom titlebar uses the same right-aligned controls on Windows, macOS, and Linux rather than native macOS traffic lights.
-- 🔓 **LAN device control has no encryption** — beyond the on-device Accept/Decline prompt, there's no auth on the local control connection; fine for a trusted home network, not intended for untrusted networks.
-- ⏳ **Playback buffers the full track before playing** rather than true progressive streaming — simpler and more robust, at the cost of a short delay (~1.5s measured) before audio starts. The download uses an explicit HTTP byte range: YouTube throttles plain full-file GETs on its media CDN to a trickle (~32 KiB/s measured, versus several MiB/s for the identical ranged request), so a range request is what makes this practical at all. Stream resolution and downloading happen on a background thread, so rapid back-to-back skipping stays responsive, but stream URLs aren't cached, so replaying a track re-resolves and re-downloads it.
-- 🍪 **Google sign-in sessions expire** — the default cookie-based sign-in lasts weeks, not forever, and is invalidated by a password change; you'll re-sign-in occasionally. The OAuth fallback refreshes silently if that matters to you.
-- 🧪 **Only Windows is build-tested** — the code contains no platform-specific branches and every dependency is cross-platform, but macOS and Linux builds haven't been run yet. Two known rough edges if you try: on macOS, hiding to the tray leaves the app in the Dock (clicking the Dock icon won't restore the window — use the tray), and on Linux the tray and media keys rely on X11, so Wayland sessions may not pick them up.
-- 📡 **Local tracks can't be cast to another device** — "Connect to a device" only works for YouTube tracks today, since the controlled device wouldn't have the same file on its own disk.
-- 🎬 **Music video mode is not working yet** — the stream resolves correctly (1080p H.264, fetchable without custom headers) but the video does not render in the webview; under investigation.
-- 🎵 **No lossless streaming** — YouTube Music's best is roughly 256 kbps AAC, and its higher-bitrate Opus streams use a codec the player can't decode, so streams are always AAC. True lossless applies to the local library only.
-- 💬 **Comments are read-only** — posting would need the YouTube Data API with OAuth write scopes, a separate auth path from the cookie sign-in. Counts shown are what was fetched, not a video's true total.
-- 📸 **Screenshots predate the current UI** — see [`docs/CAPTURE.md`](docs/CAPTURE.md) for the shot list.
-
----
-
-## 🙏 Acknowledgements
-
-- [ytmusicapi](https://github.com/sigma67/ytmusicapi) — the unofficial YouTube Music API this project is built on
-- [Tauri](https://tauri.app) — the framework making a lightweight, native cross-platform app possible
+- [ytmusicapi](https://github.com/sigma67/ytmusicapi) — the unofficial YouTube Music API this is built on
+- [yt-dlp](https://github.com/yt-dlp/yt-dlp) — stream resolution
+- [Tauri](https://tauri.app) — what makes a small native cross-platform app possible

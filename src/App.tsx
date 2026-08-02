@@ -44,6 +44,7 @@ import { useVisualizerStore } from "./store/visualizerStore";
 import { useSetupStore } from "./store/setupStore";
 import { useVideoStore } from "./store/videoStore";
 import { useUiThemeStore } from "./store/uiThemeStore";
+import { migrateLegacyStorage } from "./lib/storageMigration";
 import { useAccountStore } from "./store/accountStore";
 
 const routes = [
@@ -84,8 +85,10 @@ function App() {
   useMediaKeys();
 
   // Applied before anything else paints so the window doesn't flash the
-  // default palette on the way to the saved one.
+  // default palette on the way to the saved one. The storage migration has to
+  // come first of all — every `init()` below reads keys it may have moved.
   useEffect(() => {
+    migrateLegacyStorage();
     useUiThemeStore.getState().init();
   }, []);
 

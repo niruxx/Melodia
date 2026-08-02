@@ -18,7 +18,7 @@ type PendingMap = Arc<Mutex<HashMap<u64, oneshot::Sender<Value>>>>;
 const CALL_TIMEOUT: Duration = Duration::from_secs(180);
 
 const DEAD_SIDECAR_MSG: &str =
-    "the Python helper stopped running. Restart TuneBox, and check that Python 3 is installed.";
+    "the Python helper stopped running. Restart Melodia, and check that Python 3 is installed.";
 
 /// Manages the long-lived Python sidecar process wrapping ytmusicapi and
 /// correlates line-delimited JSON requests/responses over its stdio.

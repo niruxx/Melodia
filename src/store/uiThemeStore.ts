@@ -1,8 +1,8 @@
 import { create } from "zustand";
 
-const THEME_KEY = "tunebox:ui-theme";
-const ACCENT_KEY = "tunebox:ui-accent";
-const GRADIENT_KEY = "tunebox:ui-gradient";
+const THEME_KEY = "melodia:ui-theme";
+const ACCENT_KEY = "melodia:ui-accent";
+const GRADIENT_KEY = "melodia:ui-gradient";
 
 /**
  * Mirrors the `@theme` tokens declared in `src/index.css`. Tailwind v4 compiles

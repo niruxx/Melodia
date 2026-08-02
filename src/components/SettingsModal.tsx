@@ -134,7 +134,7 @@ export function SettingsModal() {
                 <div>
                   <div className="text-sm font-semibold">Keep playing in the background</div>
                   <div className="text-xs text-muted">
-                    Closing the window minimises TuneBox to the system tray instead of quitting,
+                    Closing the window minimises Melodia to the system tray instead of quitting,
                     so music keeps playing. Quit from the tray icon.
                   </div>
                 </div>
@@ -350,7 +350,7 @@ export function SettingsModal() {
 
               <div className="mt-2 flex items-center justify-between">
                 <div>
-                  <div className="text-sm font-semibold">Relaunch TuneBox</div>
+                  <div className="text-sm font-semibold">Relaunch Melodia</div>
                   <div className="text-xs text-muted">
                     Restarts the app. Needed after changing Python or updating the helper.
                   </div>
@@ -374,7 +374,7 @@ export function SettingsModal() {
                   Run the setup guide again
                 </button>
                 <div className="text-center text-xs text-muted">
-                  TuneBox <span className="tabular-nums">{APP_VERSION}</span>
+                  Melodia <span className="tabular-nums">{APP_VERSION}</span>
                 </div>
               </div>
             </div>

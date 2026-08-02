@@ -12,7 +12,7 @@ use tokio::net::tcp::{OwnedReadHalf, OwnedWriteHalf};
 use tokio::net::{TcpListener, TcpStream};
 use tokio::sync::{oneshot, Mutex};
 
-const SERVICE_TYPE: &str = "_tunebox._tcp.local.";
+const SERVICE_TYPE: &str = "_melodia._tcp.local.";
 
 #[derive(Clone, Serialize)]
 pub struct PeerInfo {
@@ -46,7 +46,7 @@ impl NetworkState {
         let device_name = hostname::get()
             .ok()
             .and_then(|h| h.into_string().ok())
-            .unwrap_or_else(|| "TuneBox Device".to_string());
+            .unwrap_or_else(|| "Melodia Device".to_string());
         let mdns_instance_name = format!("{}-{}", device_name, std::process::id());
         Self {
             device_name,
@@ -192,7 +192,7 @@ pub async fn network_start(
         &host_name,
         "",
         port,
-        &[("app", "tunebox"), ("name", &net.device_name)][..],
+        &[("app", "melodia"), ("name", &net.device_name)][..],
     )
     .map_err(|e| e.to_string())?
     .enable_addr_auto();

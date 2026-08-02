@@ -18,6 +18,12 @@ for poor screenshots.
 | `command-palette.png` | Command palette | <kbd>Ctrl</kbd>+<kbd>K</kbd>, type a couple of letters so results show. |
 | `themes.png` | Theme picker | Settings → Theme. Pick a non-default palette first so it's obviously themeable. |
 | `comments.png` | Comments panel | Play a track, click the speech-bubble icon in the player bar. Wait for load. |
+
+Optional extras, if you want to widen the gallery later — add matching rows to
+the README yourself:
+
+| File | What to show | How to get there |
+|---|---|---|
 | `setup-wizard.png` | First-run wizard | Settings → "Run the setup guide again", then step to the theme page. |
 | `mini-player.png` | Mini player | Click the picture-in-picture icon in the player bar. Crop tight to the window. |
 

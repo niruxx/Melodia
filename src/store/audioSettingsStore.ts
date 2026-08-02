@@ -3,11 +3,11 @@ import { invoke } from "@tauri-apps/api/core";
 import { usePlayerStore } from "./playerStore";
 import { toast } from "./toastStore";
 
-const FADE_MS_KEY = "tunebox:fade-ms";
-const EQ_BANDS_KEY = "tunebox:eq-bands";
-const BACKGROUND_KEY = "tunebox:run-in-background";
-const QUALITY_KEY = "tunebox:stream-quality";
-const OUTPUT_KEY = "tunebox:output-device";
+const FADE_MS_KEY = "melodia:fade-ms";
+const EQ_BANDS_KEY = "melodia:eq-bands";
+const BACKGROUND_KEY = "melodia:run-in-background";
+const QUALITY_KEY = "melodia:stream-quality";
+const OUTPUT_KEY = "melodia:output-device";
 const DEFAULT_FADE_MS = 400;
 
 /** Must match `BAND_FREQS_HZ` in `src-tauri/src/equalizer.rs`. */

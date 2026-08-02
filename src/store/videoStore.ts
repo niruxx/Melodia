@@ -1,7 +1,7 @@
 import { create } from "zustand";
 import { invoke } from "@tauri-apps/api/core";
 
-const ENABLED_KEY = "tunebox:video-mode";
+const ENABLED_KEY = "melodia:video-mode";
 
 export type VideoSource = {
   url: string;

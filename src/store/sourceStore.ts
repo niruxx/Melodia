@@ -2,7 +2,7 @@ import { create } from "zustand";
 
 export type MusicSource = "youtube" | "local";
 
-const STORAGE_KEY = "tunebox:active-source";
+const STORAGE_KEY = "melodia:active-source";
 
 type SourceStore = {
   active: MusicSource;

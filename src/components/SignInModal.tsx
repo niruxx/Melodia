@@ -123,7 +123,7 @@ export function SignInModal() {
                 <Loader2 size={28} className="animate-spin text-accent" />
                 <h2 className="text-lg font-bold">Waiting for Google sign-in</h2>
                 <p className="text-sm text-muted">
-                  Finish signing in in the Google window. TuneBox picks it up automatically.
+                  Finish signing in in the Google window. Melodia picks it up automatically.
                 </p>
                 <button
                   onClick={cancelSignIn}

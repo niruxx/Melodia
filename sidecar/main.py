@@ -1,5 +1,5 @@
 """
-TuneBox sidecar: a small stdin/stdout JSON-RPC-ish process wrapping ytmusicapi.
+Melodia sidecar: a small stdin/stdout JSON-RPC-ish process wrapping ytmusicapi.
 
 Protocol: one JSON object per line on stdin -> {"id": N, "cmd": "...", "args": {...}}
 One JSON object per line on stdout -> {"id": N, "ok": true, "data": ...} or

@@ -66,7 +66,7 @@ export function SetupWizard() {
               {step === "welcome" && (
                 <div className="flex flex-col items-center gap-4 text-center">
                   <AppIcon className="h-16 w-16 rounded-2xl" />
-                  <h2 className="text-2xl font-bold">Welcome to TuneBox</h2>
+                  <h2 className="text-2xl font-bold">Welcome to Melodia</h2>
                   <p className="max-w-sm text-sm text-muted">
                     Three quick choices and you're set. You can change any of them later in
                     Settings.
@@ -160,7 +160,7 @@ export function SetupWizard() {
                     <h2 className="text-xl font-bold">Choose your audio output</h2>
                   </div>
                   <p className="text-sm text-muted">
-                    Leave this on the system default unless you want TuneBox pinned to specific
+                    Leave this on the system default unless you want Melodia pinned to specific
                     speakers or a DAC.
                   </p>
                   <div className="flex flex-col gap-1.5">

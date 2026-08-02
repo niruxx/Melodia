@@ -54,7 +54,7 @@ export function Sidebar() {
     <aside className="chrome-panel flex h-full min-h-0 w-72 shrink-0 flex-col gap-2 bg-black px-2 py-2">
       <div className="flex items-center gap-2 px-3 py-2">
         <AppIcon className="h-7 w-7 rounded-md" />
-        <span className="text-lg font-bold tracking-tight">TuneBox</span>
+        <span className="text-lg font-bold tracking-tight">Melodia</span>
       </div>
 
       <div className="flex gap-2 px-3 pb-1">

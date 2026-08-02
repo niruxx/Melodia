@@ -1,6 +1,6 @@
 import { create } from "zustand";
 
-const COMPLETED_KEY = "tunebox:setup-complete";
+const COMPLETED_KEY = "melodia:setup-complete";
 
 /** Ordered steps of the first-launch wizard. */
 export const SETUP_STEPS = ["welcome", "theme", "audio", "account"] as const;

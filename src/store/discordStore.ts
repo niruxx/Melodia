@@ -2,7 +2,7 @@ import { create } from "zustand";
 import { invoke } from "@tauri-apps/api/core";
 import { DISCORD_APP_ID } from "../lib/discordConfig";
 
-const STORAGE_KEY = "tunebox:discord-enabled";
+const STORAGE_KEY = "melodia:discord-enabled";
 
 type DiscordStore = {
   enabled: boolean;

@@ -1,7 +1,7 @@
 import { create } from "zustand";
 
-const THEME_KEY = "tunebox:visualizer-theme";
-const CUSTOM_KEY = "tunebox:visualizer-custom";
+const THEME_KEY = "melodia:visualizer-theme";
+const CUSTOM_KEY = "melodia:visualizer-custom";
 
 /** Bottom and top stop of the bars' vertical gradient. */
 export type VisualizerColors = readonly [string, string];
