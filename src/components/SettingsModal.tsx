@@ -1,10 +1,32 @@
 import { useState } from "react";
+import { invoke } from "@tauri-apps/api/core";
 import { AnimatePresence, motion } from "framer-motion";
 import { X } from "lucide-react";
+import clsx from "clsx";
 import { useDiscordStore } from "../store/discordStore";
-import { EQ_BAND_FREQS_HZ, useAudioSettingsStore } from "../store/audioSettingsStore";
+import {
+  EQ_BAND_FREQS_HZ,
+  EQ_PRESETS,
+  STREAM_QUALITIES,
+  useAudioSettingsStore,
+} from "../store/audioSettingsStore";
+import { usePlayerStore } from "../store/playerStore";
+import { useSetupStore } from "../store/setupStore";
 import { useLocalLibraryStore } from "../store/localLibraryStore";
+import {
+  CUSTOM_THEME_ID,
+  VISUALIZER_THEMES,
+  useVisualizerStore,
+  type VisualizerTheme,
+} from "../store/visualizerStore";
 import { APP_VERSION } from "../lib/version";
+
+/** Mirrors the canvas gradient, which runs bottom-to-top. */
+function swatchGradient(theme: VisualizerTheme): string {
+  return theme.colors
+    ? `linear-gradient(to top, ${theme.colors[0]}, ${theme.colors[1]})`
+    : "linear-gradient(to top, var(--accent-dynamic-1), var(--accent-dynamic-2))";
+}
 
 export function SettingsModal() {
   const open = useDiscordStore((s) => s.isSettingsOpen);
@@ -19,7 +41,17 @@ export function SettingsModal() {
   const setFadeMs = useAudioSettingsStore((s) => s.setFadeMs);
   const eqBands = useAudioSettingsStore((s) => s.eqBands);
   const setEqBand = useAudioSettingsStore((s) => s.setEqBand);
+  const applyEqPreset = useAudioSettingsStore((s) => s.applyEqPreset);
   const resetEq = useAudioSettingsStore((s) => s.resetEq);
+
+  const streamQuality = useAudioSettingsStore((s) => s.streamQuality);
+  const setStreamQuality = useAudioSettingsStore((s) => s.setStreamQuality);
+  const outputDeviceId = useAudioSettingsStore((s) => s.outputDeviceId);
+  const outputDevices = useAudioSettingsStore((s) => s.outputDevices);
+  const setOutputDevice = useAudioSettingsStore((s) => s.setOutputDevice);
+  const refreshOutputDevices = useAudioSettingsStore((s) => s.refreshOutputDevices);
+  const streamFormat = usePlayerStore((s) => s.streamFormat);
+  const restartSetup = useSetupStore((s) => s.restart);
 
   const runInBackground = useAudioSettingsStore((s) => s.runInBackground);
   const setRunInBackground = useAudioSettingsStore((s) => s.setRunInBackground);
@@ -27,6 +59,11 @@ export function SettingsModal() {
   const sleepTimerEndsAt = useAudioSettingsStore((s) => s.sleepTimerEndsAt);
   const startSleepTimer = useAudioSettingsStore((s) => s.startSleepTimer);
   const cancelSleepTimer = useAudioSettingsStore((s) => s.cancelSleepTimer);
+
+  const visualizerThemeId = useVisualizerStore((s) => s.themeId);
+  const visualizerCustom = useVisualizerStore((s) => s.custom);
+  const setVisualizerTheme = useVisualizerStore((s) => s.setTheme);
+  const setVisualizerCustomColor = useVisualizerStore((s) => s.setCustomColor);
 
   const localFolder = useLocalLibraryStore((s) => s.folder);
   const localError = useLocalLibraryStore((s) => s.error);
@@ -73,19 +110,22 @@ export function SettingsModal() {
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.96, y: 12 }}
             transition={{ duration: 0.18 }}
-            className="fixed left-1/2 top-1/2 z-50 w-full max-w-md -translate-x-1/2 -translate-y-1/2 rounded-xl bg-surface-2 p-6 shadow-2xl"
+            // Capped to the viewport with the body scrolling inside, so the
+            // panel can't grow past the window as sections are added.
+            className="fixed left-1/2 top-1/2 z-50 flex max-h-[85vh] w-full max-w-md -translate-x-1/2 -translate-y-1/2 flex-col rounded-xl bg-surface-2 shadow-2xl"
           >
-            <button
-              onClick={onClose}
-              className="absolute right-4 top-4 text-muted hover:text-fg"
-              aria-label="Close"
-            >
-              <X size={18} />
-            </button>
+            <div className="shrink-0 px-6 pb-2 pt-6">
+              <button
+                onClick={onClose}
+                className="absolute right-4 top-4 text-muted hover:text-fg"
+                aria-label="Close"
+              >
+                <X size={18} />
+              </button>
+              <h2 className="text-lg font-bold">Settings</h2>
+            </div>
 
-            <h2 className="text-lg font-bold">Settings</h2>
-
-            <div className="mt-6 flex flex-col gap-3">
+            <div className="no-scrollbar flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto px-6 pb-6 pt-2">
               <div className="flex items-center justify-between">
                 <div>
                   <div className="text-sm font-semibold">Discord Rich Presence</div>
@@ -204,12 +244,89 @@ export function SettingsModal() {
                 </div>
               </div>
 
+              <div className="mt-2 flex flex-col gap-1.5">
+                <div className="text-sm font-semibold">Audio output</div>
+                <div className="text-xs text-muted">
+                  Where sound is sent. Changing this restarts the current track from where it
+                  was.
+                </div>
+                <select
+                  value={outputDeviceId ?? ""}
+                  onChange={(e) => setOutputDevice(e.target.value || null)}
+                  onFocus={() => void refreshOutputDevices()}
+                  className="rounded-md bg-surface-3 px-3 py-2 text-sm text-fg outline-none focus:ring-1 focus:ring-accent"
+                >
+                  <option value="">
+                    System default
+                    {outputDevices.find((d) => d.isDefault)
+                      ? ` (${outputDevices.find((d) => d.isDefault)?.name})`
+                      : ""}
+                  </option>
+                  {outputDevices.map((device) => (
+                    <option key={device.id} value={device.id}>
+                      {device.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="mt-2 flex flex-col gap-1.5">
+                <div className="text-sm font-semibold">Streaming quality</div>
+                <div className="text-xs text-muted">
+                  Streams are AAC — YouTube's higher-bitrate Opus audio uses a codec the player
+                  can't decode, and there's no lossless tier either way. Local files always play
+                  at their original quality.
+                </div>
+                <div className="flex gap-2">
+                  {STREAM_QUALITIES.map((q) => (
+                    <button
+                      key={q.id}
+                      onClick={() => setStreamQuality(q.id)}
+                      title={q.hint}
+                      className={clsx(
+                        "pill flex-1 px-3 py-1.5 text-xs font-semibold transition-colors",
+                        streamQuality === q.id
+                          ? "bg-fg text-black"
+                          : "bg-surface-3 text-fg hover:bg-surface-3/70",
+                      )}
+                    >
+                      {q.label}
+                    </button>
+                  ))}
+                </div>
+                {streamFormat?.acodec && (
+                  <div className="text-xs text-muted">
+                    Now playing:{" "}
+                    <span className="text-fg">
+                      {streamFormat.acodec}
+                      {streamFormat.abr ? ` · ${Math.round(streamFormat.abr)} kbps` : ""}
+                    </span>
+                  </div>
+                )}
+              </div>
+
               <div className="mt-2 flex flex-col gap-2">
                 <div className="flex items-center justify-between">
                   <div className="text-sm font-semibold">Equalizer</div>
                   <button onClick={resetEq} className="text-xs text-muted hover:text-fg">
                     Reset
                   </button>
+                </div>
+                <div className="flex flex-wrap gap-1.5">
+                  {EQ_PRESETS.map((preset) => (
+                    <button
+                      key={preset.name}
+                      onClick={() => applyEqPreset(preset.gains)}
+                      className={clsx(
+                        "pill px-2.5 py-1 text-[11px] font-semibold transition-colors",
+                        preset.gains.every((g, i) => g === eqBands[i])
+                          ? "bg-fg text-black"
+                          : "bg-surface-3 text-fg hover:bg-surface-3/70",
+                      )}
+                    >
+                      {preset.name}
+                    </button>
+                  ))}
                 </div>
                 <div className="flex items-center justify-between gap-1 rounded-lg bg-surface-3 px-2 py-3">
                   {EQ_BAND_FREQS_HZ.map((freq, i) => (
@@ -246,8 +363,88 @@ export function SettingsModal() {
                 </div>
               </div>
 
-              <div className="mt-1 border-t border-border pt-3 text-center text-xs text-muted">
-                TuneBox <span className="tabular-nums">{APP_VERSION}</span>
+              <div className="mt-2 flex flex-col gap-2">
+                <div className="text-sm font-semibold">Visualizer colours</div>
+                <div className="text-xs text-muted">
+                  Pick a palette for the spectrum bars, or let them keep following the album
+                  artwork.
+                </div>
+
+                <div className="grid grid-cols-4 gap-2">
+                  {[
+                    ...VISUALIZER_THEMES,
+                    // The custom entry previews whatever pair is currently saved.
+                    { id: CUSTOM_THEME_ID, label: "Custom", colors: visualizerCustom },
+                  ].map((theme) => {
+                    const active = visualizerThemeId === theme.id;
+                    return (
+                      <button
+                        key={theme.id}
+                        onClick={() => setVisualizerTheme(theme.id)}
+                        aria-pressed={active}
+                        className={clsx(
+                          "flex flex-col items-center gap-1.5 rounded-lg border p-1.5 transition-colors",
+                          active
+                            ? "border-accent bg-surface-3"
+                            : "border-transparent bg-surface-3/40 hover:bg-surface-3",
+                        )}
+                      >
+                        <span
+                          className="h-8 w-full rounded"
+                          style={{ backgroundImage: swatchGradient(theme) }}
+                        />
+                        <span className="text-[10px] font-semibold text-fg">{theme.label}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+
+                {visualizerThemeId === CUSTOM_THEME_ID && (
+                  <div className="flex items-center gap-4 rounded-lg bg-surface-3 px-3 py-2">
+                    {([0, 1] as const).map((i) => (
+                      <label key={i} className="flex items-center gap-2 text-xs text-muted">
+                        <input
+                          type="color"
+                          value={visualizerCustom[i]}
+                          onChange={(e) => setVisualizerCustomColor(i, e.target.value)}
+                          className="h-7 w-9 cursor-pointer rounded bg-transparent p-0"
+                          aria-label={i === 0 ? "Bottom bar colour" : "Top bar colour"}
+                        />
+                        {i === 0 ? "Bottom" : "Top"}
+                      </label>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              <div className="mt-2 flex items-center justify-between">
+                <div>
+                  <div className="text-sm font-semibold">Relaunch TuneBox</div>
+                  <div className="text-xs text-muted">
+                    Restarts the app. Needed after changing Python or updating the helper.
+                  </div>
+                </div>
+                <button
+                  onClick={() => void invoke("app_relaunch")}
+                  className="shrink-0 rounded-full bg-surface-3 px-4 py-1.5 text-xs font-semibold text-fg transition-colors hover:bg-surface-3/70"
+                >
+                  Relaunch
+                </button>
+              </div>
+
+              <div className="mt-1 flex flex-col items-center gap-2 border-t border-border pt-3">
+                <button
+                  onClick={() => {
+                    onClose();
+                    restartSetup();
+                  }}
+                  className="text-xs text-muted underline transition-colors hover:text-fg"
+                >
+                  Run the setup guide again
+                </button>
+                <div className="text-center text-xs text-muted">
+                  TuneBox <span className="tabular-nums">{APP_VERSION}</span>
+                </div>
               </div>
             </div>
           </motion.div>

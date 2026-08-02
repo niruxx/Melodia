@@ -1,10 +1,12 @@
 use std::collections::HashMap;
 use std::io::Cursor;
+use std::str::FromStr;
 use std::sync::mpsc::{self, RecvTimeoutError, Sender};
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 
-use rodio::{stream::DeviceSinkBuilder, Decoder, Player};
+use rodio::cpal::traits::{DeviceTrait, HostTrait};
+use rodio::{stream::DeviceSinkBuilder, Decoder, MixerDeviceSink, Player};
 use serde_json::json;
 use tauri::{AppHandle, Emitter};
 
@@ -25,7 +27,97 @@ enum Command {
     SetVolume(f32),
     SetFadeMs(u32),
     SetEq([f32; BAND_COUNT]),
+    /// `None` follows the system default output.
+    SetOutputDevice(Option<String>),
     Stop,
+}
+
+/// An output device as offered to the user.
+#[derive(serde::Serialize)]
+pub struct OutputDevice {
+    /// Stable across restarts and reconnections — this is what gets persisted,
+    /// rather than the display name, which isn't guaranteed unique or fixed.
+    pub id: String,
+    pub name: String,
+    pub is_default: bool,
+}
+
+/// Enumerates the system's audio outputs.
+///
+/// Failures are reported as an empty list rather than an error: a missing or
+/// busy audio host shouldn't stop the settings screen from opening, and
+/// "follow the system default" stays selectable regardless.
+pub fn list_output_devices() -> Vec<OutputDevice> {
+    let host = rodio::cpal::default_host();
+    let default_id = host.default_output_device().and_then(|d| d.id().ok());
+
+    let Ok(devices) = host.output_devices() else {
+        return Vec::new();
+    };
+    devices
+        .filter_map(|device| {
+            let id = device.id().ok()?;
+            let name = device.description().ok()?.name().to_string();
+            Some(OutputDevice {
+                is_default: Some(&id) == default_id.as_ref(),
+                id: id.to_string(),
+                name,
+            })
+        })
+        .collect()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// Enumeration has to hold its invariants on a machine with no sound card
+    /// too, so an empty list is a pass — this guards the shape of what's
+    /// returned, not the presence of hardware.
+    #[test]
+    fn output_devices_are_well_formed() {
+        let devices = list_output_devices();
+
+        for device in &devices {
+            assert!(!device.id.is_empty(), "device id must be usable as a key");
+            assert!(!device.name.is_empty(), "device needs a display name");
+            assert!(
+                rodio::cpal::DeviceId::from_str(&device.id).is_ok(),
+                "id must round-trip back for device_by_id: {}",
+                device.id
+            );
+        }
+
+        let ids: Vec<_> = devices.iter().map(|d| &d.id).collect();
+        let mut unique = ids.clone();
+        unique.sort();
+        unique.dedup();
+        assert_eq!(ids.len(), unique.len(), "device ids must be unique");
+
+        assert!(
+            devices.iter().filter(|d| d.is_default).count() <= 1,
+            "at most one device can be the system default"
+        );
+    }
+}
+
+/// Opens a sink on a specific device id, or the system default when `None`.
+fn open_sink(id: Option<&str>) -> Result<MixerDeviceSink, String> {
+    let Some(want) = id else {
+        return DeviceSinkBuilder::open_default_sink().map_err(|e| describe_error(&e));
+    };
+
+    let device_id = rodio::cpal::DeviceId::from_str(want)
+        .map_err(|_| format!("unrecognised audio output id \"{want}\""))?;
+    let device = rodio::cpal::default_host()
+        .device_by_id(&device_id)
+        // Expected whenever a saved device has since been unplugged.
+        .ok_or_else(|| "that audio output isn't connected any more".to_string())?;
+
+    DeviceSinkBuilder::from_device(device)
+        .map_err(|e| describe_error(&e))?
+        .open_stream()
+        .map_err(|e| describe_error(&e))
 }
 
 /// Messages the audio thread's loop selects over: either a real command from
@@ -91,6 +183,10 @@ impl Playback {
 
     pub fn set_eq(&self, bands: [f32; BAND_COUNT]) -> Result<(), String> {
         self.send(Command::SetEq(bands))
+    }
+
+    pub fn set_output_device(&self, name: Option<String>) -> Result<(), String> {
+        self.send(Command::SetOutputDevice(name))
     }
 
     pub fn stop(&self) -> Result<(), String> {
@@ -180,14 +276,15 @@ fn audio_thread(
     eq_gains: Arc<EqGains>,
     tap: Arc<SpectrumTap>,
 ) {
-    let device_sink = match DeviceSinkBuilder::open_default_sink() {
+    // Owned (not borrowed as a `mixer` binding) because switching output
+    // devices replaces the whole sink at runtime.
+    let mut device_sink = match open_sink(None) {
         Ok(sink) => sink,
         Err(e) => {
             let _ = app.emit("playback:error", format!("no audio output device: {e}"));
             return;
         }
     };
-    let mixer = device_sink.mixer();
     let mut player: Option<Player> = None;
     // Bumped on every Play/Stop so a fetch that finishes after being
     // superseded (by a newer Play or a Stop) gets discarded instead of
@@ -282,6 +379,30 @@ fn audio_thread(
             Ok(Msg::Cmd(Command::SetEq(bands))) => {
                 eq_gains.set_all(&bands);
             }
+            Ok(Msg::Cmd(Command::SetOutputDevice(name))) => {
+                match open_sink(name.as_deref()) {
+                    Ok(sink) => {
+                        // The live player is wired to the outgoing sink's
+                        // mixer, so it cannot survive the swap. Report the
+                        // interruption so the UI can resume where it was
+                        // rather than appearing to stop for no reason.
+                        let was_playing = player.as_ref().is_some_and(|p| !p.is_paused());
+                        let position = player.as_ref().map(|p| p.get_pos().as_secs_f64());
+                        player = None;
+                        fade = None;
+                        generation += 1;
+                        device_sink = sink;
+                        let _ = app.emit(
+                            "playback:output-changed",
+                            json!({ "wasPlaying": was_playing, "position": position }),
+                        );
+                    }
+                    Err(e) => {
+                        // Keep playing on the existing device; only the switch failed.
+                        let _ = app.emit("playback:error", e);
+                    }
+                }
+            }
             Ok(Msg::Cmd(Command::Stop)) => {
                 // Invalidate any in-flight fetch regardless of branch below.
                 generation += 1;
@@ -308,7 +429,7 @@ fn audio_thread(
                         .and_then(|bytes| Decoder::new(Cursor::new(bytes)).map_err(|e| e.to_string()))
                     {
                         Ok(source) => {
-                            let p = Player::connect_new(mixer);
+                            let p = Player::connect_new(device_sink.mixer());
                             // EQ first so the visualiser shows what's actually
                             // being heard, not the pre-EQ signal.
                             p.append(Analyzer::new(

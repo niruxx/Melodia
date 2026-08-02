@@ -498,10 +498,171 @@ def cmd_get_lyrics(args):
     return {"lyrics": result.get("lyrics"), "source": result.get("source")}
 
 
+# YouTube Music tops out around 256 kbps AAC/Opus — there is no lossless tier
+# to request, so these cap bitrate rather than unlock anything above "best".
+QUALITY_BITRATE_CAP = {
+    "best": None,
+    "high": 160,
+    "low": 70,
+}
+
+
+# Containers the playback engine can actually decode, best first.
+#
+# rodio builds on Symphonia, which here demuxes MP4/Ogg/WAV/FLAC and decodes
+# AAC/MP3/Vorbis/FLAC/ALAC/PCM. It has neither an Opus decoder nor a WebM
+# demuxer, so YouTube's webm/opus streams are unplayable — and they're usually
+# the *highest* bitrate on offer, so a plain "bestaudio" selector picks exactly
+# the one format that cannot be played. Every selector must pin a container we
+# can decode.
+DECODABLE_CONTAINERS = ("[ext=m4a]", "[ext=mp3]", "[ext=ogg]")
+
+
+def stream_format_selector(quality: str) -> str:
+    """Builds a yt-dlp format selector for the requested quality.
+
+    Bitrate-capped and decodable variants come first, widening to any audio
+    only as a last resort — a track that plays at the wrong bitrate beats one
+    that doesn't play at all.
+    """
+    cap = QUALITY_BITRATE_CAP.get(quality, None)
+    capped = f"bestaudio[abr<={cap}]" if cap else "bestaudio"
+
+    chain = [f"{capped}{container}" for container in DECODABLE_CONTAINERS]
+    chain += [f"bestaudio{container}" for container in DECODABLE_CONTAINERS]
+    chain.append("bestaudio")
+    # Duplicates collapse when no cap is set; yt-dlp shouldn't be handed
+    # `bestaudio[ext=m4a]/bestaudio[ext=m4a]`.
+    return "/".join(dict.fromkeys(chain))
+
+
+def cmd_get_video_url(args):
+    """Resolves a *video-only* stream to layer over the existing audio engine.
+
+    Deliberately not the muxed format: YouTube offers exactly one (itag 18,
+    360p), and using it would mean the webview produced the sound, bypassing
+    the equalizer, visualiser, fades and output-device routing. A silent video
+    track synced to the Rust audio keeps all of that and reaches 1080p.
+
+    H.264/MP4 is preferred over VP9/AV1 for the widest webview support.
+    """
+    video_id = args["videoId"]
+    max_height = max(144, min(int(args.get("maxHeight") or 1080), 2160))
+
+    selector = (
+        f"bestvideo[ext=mp4][vcodec^=avc1][height<={max_height}]"
+        f"/bestvideo[ext=mp4][height<={max_height}]"
+        f"/bestvideo[height<={max_height}]"
+        "/bestvideo"
+    )
+    ydl_opts = {
+        "quiet": True,
+        "no_warnings": True,
+        "noplaylist": True,
+        "socket_timeout": REQUEST_TIMEOUT_SECONDS,
+        "format": selector,
+    }
+    with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+        info = ydl.extract_info(f"https://www.youtube.com/watch?v={video_id}", download=False)
+
+    return {
+        "url": info.get("url"),
+        "ext": info.get("ext"),
+        "width": info.get("width"),
+        "height": info.get("height"),
+        "fps": info.get("fps"),
+        "vcodec": info.get("vcodec"),
+    }
+
+
+COMMENT_SORTS = ("top", "new")
+
+
+def cmd_get_comments(args):
+    """Fetches a video's YouTube comments via yt-dlp's InnerTube extractor.
+
+    Read-only: posting would need the Data API with OAuth write scopes, which
+    is a different auth path entirely from the cookie sign-in.
+    """
+    video_id = args["videoId"]
+    limit = max(1, min(int(args.get("limit") or 50), 300))
+    sort = args.get("sort") if args.get("sort") in COMMENT_SORTS else "top"
+    per_thread = max(0, min(int(args.get("repliesPerThread") or 0), 10))
+
+    ydl_opts = {
+        "quiet": True,
+        "no_warnings": True,
+        "skip_download": True,
+        "getcomments": True,
+        "socket_timeout": REQUEST_TIMEOUT_SECONDS,
+        "extractor_args": {
+            "youtube": {
+                # max-comments, max-parents, max-replies, max-replies-per-thread.
+                #
+                # The first value is a budget for *everything*, replies
+                # included, so it has to be raised to cover them — otherwise
+                # replies eat into the top-level count and the caller silently
+                # gets roughly half the comments it asked for. `limit` is
+                # therefore enforced through max-parents, which counts only
+                # top-level comments.
+                #
+                # A couple of replies still tend to arrive whose parent isn't
+                # in the fetched window; the UI keys replies off their parent
+                # and so just doesn't render those.
+                "max_comments": [
+                    str(limit * (1 + per_thread)),
+                    str(limit),
+                    str(limit * per_thread) if per_thread else "0",
+                    str(per_thread),
+                ],
+                "comment_sort": [sort],
+            }
+        },
+    }
+    with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+        info = ydl.extract_info(f"https://www.youtube.com/watch?v={video_id}", download=False)
+
+    raw = info.get("comments")
+    comments = [
+        {
+            "id": c.get("id"),
+            # yt-dlp uses "root" for top-level entries; replies carry their
+            # parent's id.
+            "parent": c.get("parent") or "root",
+            "author": c.get("author"),
+            "authorThumbnail": c.get("author_thumbnail"),
+            "authorIsUploader": bool(c.get("author_is_uploader")),
+            "authorIsVerified": bool(c.get("author_is_verified")),
+            "text": c.get("text") or "",
+            "likeCount": c.get("like_count"),
+            "timeText": c.get("_time_text"),
+            "isPinned": bool(c.get("is_pinned")),
+        }
+        for c in (raw or [])
+        if isinstance(c, dict)
+    ]
+
+    top_level = sum(1 for c in comments if c["parent"] == "root")
+
+    return {
+        "videoId": video_id,
+        "sort": sort,
+        "comments": comments,
+        # `raw is None` is how yt-dlp reports comments being turned off, which
+        # is distinct from a video that simply has none yet.
+        "disabled": raw is None,
+        # Counts only what was fetched, and only top-level entries — yt-dlp
+        # caps at `limit`, so this is never the video's true comment count.
+        "fetched": top_level,
+        "reachedLimit": top_level >= limit,
+    }
+
+
 def cmd_get_stream_url(args):
     video_id = args["videoId"]
+    quality = (args or {}).get("quality") or "best"
     ydl_opts = {
-        "format": "bestaudio[ext=m4a]/bestaudio",
+        "format": stream_format_selector(quality),
         "quiet": True,
         "no_warnings": True,
         "noplaylist": True,
@@ -514,6 +675,11 @@ def cmd_get_stream_url(args):
     return {
         "url": info.get("url"),
         "ext": info.get("ext"),
+        # Reported back so the UI can show the quality actually served rather
+        # than the quality that was asked for — they differ whenever a track
+        # has no stream matching the request.
+        "abr": info.get("abr"),
+        "acodec": info.get("acodec"),
         # YouTube's CDN stalls/throttles requests that don't look like a
         # real browser fetching the watch page — these are yt-dlp's own
         # recommended headers for downloading this specific stream URL.
@@ -542,8 +708,46 @@ COMMANDS = {
     "search": cmd_search,
     "get_account_info": cmd_get_account_info,
     "get_lyrics": cmd_get_lyrics,
+    "get_comments": cmd_get_comments,
+    "get_video_url": cmd_get_video_url,
     "get_stream_url": cmd_get_stream_url,
 }
+
+
+# Commands allowed to run off the main loop. Everything else stays strictly
+# ordered, because auth and the playlist mutations depend on that ordering.
+# Comment fetches take seconds, and blocking the loop on one would delay
+# starting the next track.
+THREADED_COMMANDS = {"get_comments", "get_video_url"}
+
+_stdout_lock = threading.Lock()
+
+
+def respond(resp):
+    """Writes one response line.
+
+    Threaded commands reply out of order and two half-written lines would
+    corrupt the stream, so writes are serialised. Ordering itself doesn't
+    matter — the Rust side correlates replies by `id`.
+    """
+    line = json.dumps(resp)
+    with _stdout_lock:
+        sys.stdout.write(line + "\n")
+        sys.stdout.flush()
+
+
+def run_command(req_id, cmd, args):
+    try:
+        handler = COMMANDS.get(cmd)
+        if handler is None:
+            raise ValueError(f"unknown command: {cmd}")
+        respond({"id": req_id, "ok": True, "data": handler(args)})
+    except Exception as e:
+        # Name the command in the message. Some failures surface as bare OS
+        # errors ("[Errno 22] Invalid argument") that are impossible to trace
+        # back to what the app was doing without this.
+        detail = str(e) or type(e).__name__
+        respond({"id": req_id, "ok": False, "error": f"{cmd or 'request'}: {detail}"})
 
 
 def main():
@@ -551,24 +755,20 @@ def main():
         line = line.strip()
         if not line:
             continue
-        req_id = None
-        cmd = None
         try:
             req = json.loads(line)
-            req_id = req.get("id")
-            cmd = req.get("cmd")
-            handler = COMMANDS.get(cmd)
-            if handler is None:
-                raise ValueError(f"unknown command: {cmd}")
-            data = handler(req.get("args") or {})
-            resp = {"id": req_id, "ok": True, "data": data}
         except Exception as e:
-            # Name the command in the message. Some failures surface as bare
-            # OS errors ("[Errno 22] Invalid argument") that are impossible to
-            # trace back to what the app was doing without this.
-            detail = str(e) or type(e).__name__
-            resp = {"id": req_id, "ok": False, "error": f"{cmd or 'request'}: {detail}"}
-        print(json.dumps(resp), flush=True)
+            respond({"id": None, "ok": False, "error": f"request: {e}"})
+            continue
+
+        req_id = req.get("id")
+        cmd = req.get("cmd")
+        args = req.get("args") or {}
+
+        if cmd in THREADED_COMMANDS:
+            threading.Thread(target=run_command, args=(req_id, cmd, args), daemon=True).start()
+        else:
+            run_command(req_id, cmd, args)
 
 
 if __name__ == "__main__":

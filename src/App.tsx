@@ -8,9 +8,11 @@ import { TopBar } from "./components/TopBar";
 import { NowPlayingBar } from "./components/NowPlayingBar";
 import { NowPlayingExpanded } from "./components/NowPlayingExpanded";
 import { QueueDrawer } from "./components/QueueDrawer";
+import { CommentsDrawer } from "./components/CommentsDrawer";
 import { SignInModal } from "./components/SignInModal";
 import { SettingsModal } from "./components/SettingsModal";
 import { DeviceConnectModal } from "./components/DeviceConnectModal";
+import { SetupWizard } from "./components/SetupWizard";
 import { PlaylistFormModal } from "./components/PlaylistFormModal";
 import { AddToPlaylistModal } from "./components/AddToPlaylistModal";
 import { IncomingControlRequestModal } from "./components/IncomingControlRequestModal";
@@ -38,6 +40,9 @@ import { useAudioSettingsStore } from "./store/audioSettingsStore";
 import { useSourceStore } from "./store/sourceStore";
 import { useLocalLibraryStore } from "./store/localLibraryStore";
 import { useThemeStore } from "./store/themeStore";
+import { useVisualizerStore } from "./store/visualizerStore";
+import { useSetupStore } from "./store/setupStore";
+import { useVideoStore } from "./store/videoStore";
 import { useAccountStore } from "./store/accountStore";
 
 const routes = [
@@ -84,6 +89,9 @@ function App() {
     useAudioSettingsStore.getState().init();
     useSourceStore.getState().init();
     useLocalLibraryStore.getState().init();
+    useVisualizerStore.getState().init();
+    useSetupStore.getState().init();
+    useVideoStore.getState().init();
   }, []);
 
   useEffect(() => {
@@ -141,6 +149,7 @@ function App() {
         <NowPlayingBar />
       </div>
       <QueueDrawer />
+      <CommentsDrawer />
       <NowPlayingExpanded />
       <SignInModal />
       <SettingsModal />
@@ -151,6 +160,7 @@ function App() {
       <ContextMenu />
       <CommandPalette />
       <ShortcutsOverlay />
+      <SetupWizard />
       <Toaster />
       <GlobalShortcuts />
     </HashRouter>

@@ -3,8 +3,10 @@ import { useNavigate } from "react-router-dom";
 import {
   Copy,
   Disc3,
+  ExternalLink,
   Heart,
   HeartOff,
+  Link2,
   ListEnd,
   ListPlus,
   ListStart,
@@ -16,6 +18,7 @@ import { useAuthStore } from "../store/authStore";
 import { useContextMenuStore, type MenuItem } from "../store/contextMenuStore";
 import { usePlaylistModalStore } from "../store/playlistModalStore";
 import { toast } from "../store/toastStore";
+import { copyLink, openLink, trackShareUrl } from "../lib/share";
 import type { Track } from "../lib/types";
 
 export type TrackMenuOptions = {
@@ -104,19 +107,34 @@ export function useTrackContextMenu() {
       });
     }
 
-    items.push(
-      { kind: "separator" },
-      {
-        label: "Copy song name",
-        icon: Copy,
-        onSelect: () => {
-          navigator.clipboard
-            .writeText(`${track.title} — ${track.artist}`)
-            .then(() => toast.info("Copied to clipboard"))
-            .catch(() => toast.error("Couldn't copy to clipboard"));
+    items.push({ kind: "separator" });
+
+    // A local file has no YouTube page to point anyone at.
+    if (!isLocal) {
+      items.push(
+        {
+          label: "Copy share link",
+          icon: Link2,
+          onSelect: () => void copyLink(trackShareUrl(track.id), "Song"),
         },
+        {
+          label: "Open in YouTube Music",
+          icon: ExternalLink,
+          onSelect: () => void openLink(trackShareUrl(track.id)),
+        },
+      );
+    }
+
+    items.push({
+      label: "Copy song name",
+      icon: Copy,
+      onSelect: () => {
+        navigator.clipboard
+          .writeText(`${track.title} — ${track.artist}`)
+          .then(() => toast.info("Copied to clipboard"))
+          .catch(() => toast.error("Couldn't copy to clipboard"));
       },
-    );
+    });
 
     openMenu(event.clientX, event.clientY, items);
   };

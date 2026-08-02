@@ -211,6 +211,41 @@ pub async fn ytm_get_lyrics(sidecar: State<'_, Sidecar>, video_id: String) -> Re
 }
 
 #[tauri::command]
+pub async fn ytm_get_video_url(
+    sidecar: State<'_, Sidecar>,
+    video_id: String,
+    max_height: Option<u32>,
+) -> Result<Value, String> {
+    sidecar
+        .call(
+            "get_video_url",
+            serde_json::json!({ "videoId": video_id, "maxHeight": max_height.unwrap_or(1080) }),
+        )
+        .await
+}
+
+#[tauri::command]
+pub async fn ytm_get_comments(
+    sidecar: State<'_, Sidecar>,
+    video_id: String,
+    limit: Option<u32>,
+    sort: Option<String>,
+    replies_per_thread: Option<u32>,
+) -> Result<Value, String> {
+    sidecar
+        .call(
+            "get_comments",
+            serde_json::json!({
+                "videoId": video_id,
+                "limit": limit.unwrap_or(50),
+                "sort": sort.unwrap_or_else(|| "top".into()),
+                "repliesPerThread": replies_per_thread.unwrap_or(0),
+            }),
+        )
+        .await
+}
+
+#[tauri::command]
 pub async fn discord_connect(discord: State<'_, Discord>, app_id: String) -> Result<(), String> {
     discord.connect(app_id).await
 }
@@ -230,14 +265,42 @@ pub async fn discord_disconnect(discord: State<'_, Discord>) -> Result<(), Strin
     discord.disconnect().await
 }
 
+/// Restarts the app. Never returns — the current process is replaced.
+#[tauri::command]
+pub fn app_relaunch(app: tauri::AppHandle) {
+    // Exits the background-mode close guard deliberately: a relaunch should
+    // actually tear the process down rather than hide to the tray.
+    app.restart()
+}
+
+#[tauri::command]
+pub fn playback_list_outputs() -> Vec<crate::playback::OutputDevice> {
+    crate::playback::list_output_devices()
+}
+
+#[tauri::command]
+pub fn playback_set_output(
+    playback: State<'_, Playback>,
+    device_id: Option<String>,
+) -> Result<(), String> {
+    playback.set_output_device(device_id)
+}
+
 #[tauri::command]
 pub async fn playback_play(
     sidecar: State<'_, Sidecar>,
     playback: State<'_, Playback>,
     video_id: String,
-) -> Result<(), String> {
+    quality: Option<String>,
+) -> Result<Value, String> {
     let data = sidecar
-        .call("get_stream_url", serde_json::json!({ "videoId": video_id }))
+        .call(
+            "get_stream_url",
+            serde_json::json!({
+                "videoId": video_id,
+                "quality": quality.unwrap_or_else(|| "best".into()),
+            }),
+        )
         .await?;
     let url = data
         .get("url")
@@ -253,7 +316,15 @@ pub async fn playback_play(
                 .collect()
         })
         .unwrap_or_default();
-    playback.play(url, headers)
+    playback.play(url, headers)?;
+
+    // Hand back what was actually served, which isn't always what was asked
+    // for — a track with no stream at the requested codec/bitrate falls back.
+    Ok(serde_json::json!({
+        "ext": data.get("ext").cloned().unwrap_or(Value::Null),
+        "abr": data.get("abr").cloned().unwrap_or(Value::Null),
+        "acodec": data.get("acodec").cloned().unwrap_or(Value::Null),
+    }))
 }
 
 #[tauri::command]

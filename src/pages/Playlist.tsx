@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { AnimatePresence, motion } from "framer-motion";
-import { Loader2, MoreHorizontal, Pencil, Trash2 } from "lucide-react";
+import { ExternalLink, Link2, Loader2, MoreHorizontal, Pencil, Share2, Trash2 } from "lucide-react";
 import { CoverArt } from "../components/CoverArt";
 import { TrackList } from "../components/TrackList";
 import { PlayControls } from "../components/PlayControls";
@@ -15,6 +15,7 @@ import { useLocalLibraryStore } from "../store/localLibraryStore";
 import { useContextMenuStore } from "../store/contextMenuStore";
 import { usePlaylistModalStore } from "../store/playlistModalStore";
 import { toast } from "../store/toastStore";
+import { collectionShareUrl, copyLink, openLink } from "../lib/share";
 import type { Track } from "../lib/types";
 
 export function Playlist() {
@@ -217,6 +218,33 @@ export function Playlist() {
         <>
           <div className="flex items-center gap-4">
             <PlayControls onPlay={handlePlay} onShuffle={handleShuffle} />
+            {/* Local albums and the synthetic single-song collections from the
+                home shelves have no YouTube Music page behind them. */}
+            {!isLocal && id && !id.startsWith("song-") && (
+              <button
+                onClick={(e) => {
+                  const rect = e.currentTarget.getBoundingClientRect();
+                  const url = collectionShareUrl(id);
+                  openMenu(rect.left, rect.bottom + 4, [
+                    {
+                      label: "Copy share link",
+                      icon: Link2,
+                      onSelect: () => void copyLink(url, collection?.kind === "album" ? "Album" : "Playlist"),
+                    },
+                    {
+                      label: "Open in YouTube Music",
+                      icon: ExternalLink,
+                      onSelect: () => void openLink(url),
+                    },
+                  ]);
+                }}
+                className="flex h-10 w-10 items-center justify-center rounded-full text-muted transition-colors hover:bg-surface-2 hover:text-fg"
+                aria-label="Share"
+                title="Share"
+              >
+                <Share2 size={18} />
+              </button>
+            )}
             {canEdit && (
               <button
                 onClick={openOverflowMenu}

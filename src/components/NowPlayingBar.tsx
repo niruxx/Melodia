@@ -4,6 +4,7 @@ import {
   Heart,
   ListMusic,
   Maximize2,
+  MessageSquare,
   Pause,
   PictureInPicture2,
   Play,
@@ -23,6 +24,7 @@ import { SleepTimerChip } from "./SleepTimerChip";
 import { usePlayerStore } from "../store/playerStore";
 import { useNetworkStore } from "../store/networkStore";
 import { useMiniPlayerStore } from "../store/miniPlayerStore";
+import { useCommentsStore } from "../store/commentsStore";
 import { formatDuration } from "../lib/format";
 
 const tap = { scale: 0.9 };
@@ -47,6 +49,8 @@ export function NowPlayingBar() {
   const toggleLike = usePlayerStore((s) => s.toggleLike);
   const setExpanded = usePlayerStore((s) => s.setExpanded);
   const setQueueOpen = usePlayerStore((s) => s.setQueueOpen);
+  const isCommentsOpen = useCommentsStore((s) => s.isOpen);
+  const setCommentsOpen = useCommentsStore((s) => s.setOpen);
   const isQueueOpen = usePlayerStore((s) => s.isQueueOpen);
 
   const networkRole = useNetworkStore((s) => s.role);
@@ -213,6 +217,18 @@ export function NowPlayingBar() {
             aria-label="Queue"
           >
             <ListMusic size={18} />
+          </motion.button>
+          <motion.button
+            whileTap={tap}
+            onClick={() => setCommentsOpen(!isCommentsOpen)}
+            className={clsx(
+              "text-muted transition-colors hover:text-fg",
+              isCommentsOpen && "text-accent",
+            )}
+            aria-label="Comments"
+            title="YouTube comments"
+          >
+            <MessageSquare size={18} />
           </motion.button>
           <motion.button
             whileTap={tap}

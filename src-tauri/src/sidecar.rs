@@ -1,6 +1,6 @@
 use serde_json::Value;
 use std::collections::HashMap;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::process::Stdio;
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::Arc;
@@ -41,6 +41,30 @@ const PYTHON_CANDIDATES: &[&str] = &["python", "python3", "py"];
 #[cfg(not(windows))]
 const PYTHON_CANDIDATES: &[&str] = &["python3", "python"];
 
+/// `CREATE_NO_WINDOW`. `python.exe` is a console-subsystem binary, so Windows
+/// hands it a console of its own — which shows up as a stray cmd window
+/// alongside the app. The sidecar only ever talks over piped stdio, so it has
+/// no use for one.
+#[cfg(windows)]
+const CREATE_NO_WINDOW: u32 = 0x0800_0000;
+
+/// Builds the interpreter invocation, consistently across every candidate.
+fn python_command(exe: &str, script: &Path, data_dir: &Path) -> Command {
+    let mut command = Command::new(exe);
+    command
+        .arg(script)
+        .arg(data_dir)
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::inherit())
+        .kill_on_drop(true);
+
+    #[cfg(windows)]
+    command.creation_flags(CREATE_NO_WINDOW);
+
+    command
+}
+
 impl Sidecar {
     /// Locates `sidecar/main.py`.
     ///
@@ -66,15 +90,7 @@ impl Sidecar {
         let mut last_err = None;
         let mut spawned = None;
         for exe in PYTHON_CANDIDATES {
-            match Command::new(exe)
-                .arg(&script)
-                .arg(&data_dir)
-                .stdin(Stdio::piped())
-                .stdout(Stdio::piped())
-                .stderr(Stdio::inherit())
-                .kill_on_drop(true)
-                .spawn()
-            {
+            match python_command(exe, &script, &data_dir).spawn() {
                 Ok(child) => {
                     spawned = Some(child);
                     break;

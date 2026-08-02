@@ -3,6 +3,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import type { Track } from "../lib/mockData";
 import type { RemoteCommand, RemoteState } from "../lib/types";
+import { useAudioSettingsStore, type StreamFormat } from "./audioSettingsStore";
 
 export type RepeatMode = "off" | "all" | "one";
 
@@ -18,6 +19,9 @@ type PlayerState = {
   isQueueOpen: boolean;
   likedIds: Record<string, boolean>;
   playbackError: string | null;
+  /** What the engine actually served for the current track; null for local
+   * files, which play at their own native quality. */
+  streamFormat: StreamFormat | null;
   /** Volume to restore when unmuting; null when not muted. */
   premuteVolume: number | null;
 
@@ -58,9 +62,15 @@ const LOCAL_ID_PREFIX = "local:";
 function playReal(track: Track, onError: (message: string) => void) {
   if (track.id.startsWith(LOCAL_ID_PREFIX)) {
     const path = track.id.slice(LOCAL_ID_PREFIX.length);
+    // Local files are decoded straight from disk, so whatever the container
+    // holds is what's heard — FLAC/ALAC/WAV stay bit-for-bit intact.
+    usePlayerStore.setState({ streamFormat: null });
     invoke("playback_play_local", { path }).catch((e) => onError(String(e)));
   } else {
-    invoke("playback_play", { videoId: track.id }).catch((e) => onError(String(e)));
+    const { streamQuality } = useAudioSettingsStore.getState();
+    invoke<StreamFormat>("playback_play", { videoId: track.id, quality: streamQuality })
+      .then((format) => usePlayerStore.setState({ streamFormat: format }))
+      .catch((e) => onError(String(e)));
   }
 }
 
@@ -76,6 +86,7 @@ export const usePlayerStore = create<PlayerState>((set, get) => ({
   isQueueOpen: false,
   likedIds: {},
   playbackError: null,
+  streamFormat: null,
   premuteVolume: null,
   remoteSend: null,
 
@@ -306,12 +317,40 @@ export const usePlayerStore = create<PlayerState>((set, get) => ({
 // Real playback position/end-of-track events from the Rust audio engine —
 // only meaningful on whichever device is actually driving local playback
 // (i.e. not currently controlling another device over the network).
+/** Set when a track has been restarted to resume it after an output switch. */
+let pendingResumeAt: number | null = null;
+
 listen<number>("playback:position", (event) => {
   if (usePlayerStore.getState().remoteSend) return;
+  // The first tick after a restart means the decoder is live, which is the
+  // earliest a seek will actually land.
+  if (pendingResumeAt !== null) {
+    const target = pendingResumeAt;
+    pendingResumeAt = null;
+    usePlayerStore.getState().seek(target);
+    return;
+  }
   // A position tick means the engine is actively playing — clear any error
   // left behind by an earlier, since-superseded fetch that failed after this
   // one had already started succeeding.
   usePlayerStore.setState({ progress: event.payload, playbackError: null });
+});
+
+// Switching output device tears down the sink the player was wired to, so the
+// track has to be restarted. Jump back to where it was rather than silently
+// dropping to the start or stopping altogether.
+listen<{ wasPlaying: boolean; position: number | null }>("playback:output-changed", (event) => {
+  const state = usePlayerStore.getState();
+  if (state.remoteSend || !event.payload.wasPlaying) return;
+  const track = state.currentTrack();
+  if (!track) return;
+
+  const position = event.payload.position ?? 0;
+  pendingResumeAt = position > 1 ? position : null;
+  usePlayerStore.setState({ isPlaying: true });
+  playReal(track, (message) =>
+    usePlayerStore.setState({ playbackError: message, isPlaying: false }),
+  );
 });
 
 listen("playback:ended", () => {

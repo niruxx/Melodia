@@ -27,7 +27,9 @@ tokio = { version = "1", features = ["process", "io-util", "io-std", "rt", "sync
 discord-rich-presence = "0.2"
 mdns-sd = "0.20"
 hostname = "0.4"
-rodio = "0.22"
+# Defaults already cover FLAC/WAV/MP3/AAC. ALAC and AIFF are the remaining
+# lossless formats a local library realistically contains, and they're opt-in.
+rodio = { version = "0.22", features = ["symphonia-alac", "symphonia-aiff"] }
 reqwest = { version = "0.13", default-features = false, features = ["blocking", "native-tls"] }
 walkdir = "2"
 lofty = "0.24"

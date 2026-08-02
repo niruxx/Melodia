@@ -2,6 +2,7 @@ import { motion } from "framer-motion";
 import { Minimize2, Pause, Play, SkipBack, SkipForward } from "lucide-react";
 import { CoverArt } from "./CoverArt";
 import { Marquee } from "./Marquee";
+import { Visualizer } from "./Visualizer";
 import { usePlayerStore } from "../store/playerStore";
 import { useMiniPlayerStore } from "../store/miniPlayerStore";
 import { formatDuration } from "../lib/format";
@@ -21,10 +22,22 @@ export function MiniPlayer() {
   const pct = duration > 0 ? (progress / duration) * 100 : 0;
 
   return (
-    <div className="flex h-screen w-screen flex-col overflow-hidden bg-black text-fg">
+    <div className="relative flex h-screen w-screen flex-col overflow-hidden bg-black text-fg">
+      {/* Sits behind the controls as ambience rather than a separate widget —
+          there's no room for one in a strip this size. `pointer-events-none`
+          keeps the drag region and buttons above it fully usable. */}
+      <Visualizer
+        variant="mirror"
+        className="pointer-events-none absolute inset-x-0 bottom-0 top-0 opacity-25"
+      />
+      <div
+        className="pointer-events-none absolute inset-0 bg-gradient-to-r from-black via-black/40 to-black"
+        aria-hidden
+      />
+
       {/* Whole strip is a drag region so the tiny window stays movable
           without a titlebar; buttons opt out via their own handlers. */}
-      <div data-tauri-drag-region className="flex flex-1 items-center gap-3 px-3">
+      <div data-tauri-drag-region className="relative flex flex-1 items-center gap-3 px-3">
         {track ? (
           <>
             <CoverArt
@@ -83,7 +96,7 @@ export function MiniPlayer() {
         </div>
       </div>
 
-      <div className="flex items-center gap-2 px-3 pb-2 text-[10px] tabular-nums text-muted">
+      <div className="relative flex items-center gap-2 px-3 pb-2 text-[10px] tabular-nums text-muted">
         <span className="w-8 text-right">{formatDuration(progress)}</span>
         <input
           type="range"

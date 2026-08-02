@@ -8,13 +8,20 @@ import {
   Repeat,
   Repeat1,
   Shuffle,
+  Loader2,
   SkipBack,
   SkipForward,
+  Video,
+  VideoOff,
+  Volume2,
+  VolumeX,
 } from "lucide-react";
 import clsx from "clsx";
 import { CoverArt } from "./CoverArt";
 import { Skeleton } from "./Skeleton";
 import { Visualizer } from "./Visualizer";
+import { VideoLayer } from "./VideoLayer";
+import { useVideoStore } from "../store/videoStore";
 import { usePlayerStore } from "../store/playerStore";
 import { useAuthStore } from "../store/authStore";
 import { formatDuration } from "../lib/format";
@@ -40,6 +47,28 @@ export function NowPlayingExpanded() {
   const toggleShuffle = usePlayerStore((s) => s.toggleShuffle);
   const cycleRepeat = usePlayerStore((s) => s.cycleRepeat);
   const toggleLike = usePlayerStore((s) => s.toggleLike);
+  const volume = usePlayerStore((s) => s.volume);
+  const setVolume = usePlayerStore((s) => s.setVolume);
+  const toggleMute = usePlayerStore((s) => s.toggleMute);
+
+  const videoEnabled = useVideoStore((s) => s.enabled);
+  const setVideoEnabled = useVideoStore((s) => s.setEnabled);
+  const videoError = useVideoStore((s) => s.error);
+  const loadVideo = useVideoStore((s) => s.load);
+  const clearVideo = useVideoStore((s) => s.clear);
+  const videoLoading = useVideoStore((s) => s.loadingFor !== null);
+  // Local files have no YouTube video behind them.
+  const canShowVideo = Boolean(track && !track.id.startsWith("local:"));
+
+  // Resolve on demand rather than for every track: the lookup is a network
+  // round trip, and most listening happens with video off.
+  useEffect(() => {
+    if (!videoEnabled || !canShowVideo || !track) {
+      clearVideo();
+      return;
+    }
+    void loadVideo(track.id);
+  }, [videoEnabled, canShowVideo, track?.id, loadVideo, clearVideo]);
 
   const RepeatIcon = repeat === "one" ? Repeat1 : Repeat;
 
@@ -109,13 +138,49 @@ export function NowPlayingExpanded() {
                 animate={{ scale: 1, opacity: 1 }}
                 transition={{ duration: 0.3, ease: "easeOut", delay: 0.05 }}
               >
-                <CoverArt
-                  seed={`${track.album}-${track.title}`}
-                  src={track.thumbnail}
-                  rounded="lg"
-                  className="h-56 w-56 sm:h-72 sm:w-72"
-                />
+                {/* The video keeps the artwork's square footprint so switching
+                    modes doesn't reflow the column. */}
+                <div className="relative h-56 w-56 overflow-hidden rounded-xl sm:h-72 sm:w-72">
+                  <CoverArt
+                    seed={`${track.album}-${track.title}`}
+                    src={track.thumbnail}
+                    rounded="lg"
+                    className="h-full w-full"
+                  />
+                  {videoEnabled && (
+                    <div className="absolute inset-0 bg-black">
+                      <VideoLayer />
+                      {videoLoading && (
+                        <div className="absolute inset-0 flex items-center justify-center bg-black/60">
+                          <Loader2 size={22} className="animate-spin text-accent" />
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
               </motion.div>
+
+              {canShowVideo && (
+                <button
+                  onClick={() => setVideoEnabled(!videoEnabled)}
+                  className={clsx(
+                    "mt-4 flex items-center gap-2 rounded-full px-3 py-1.5 text-xs font-semibold transition-colors",
+                    videoEnabled
+                      ? "bg-accent text-black"
+                      : "bg-surface-2 text-fg hover:bg-surface-3",
+                  )}
+                  title="Play the music video in place of the artwork"
+                >
+                  {videoEnabled ? <Video size={14} /> : <VideoOff size={14} />}
+                  {videoEnabled ? "Video on" : "Video off"}
+                </button>
+              )}
+
+              {videoEnabled && videoError && (
+                <p className="mt-2 max-w-xs text-center text-xs text-muted">
+                  No video available for this track.
+                </p>
+              )}
 
               <div className="mt-8 flex w-full min-w-0 items-center justify-center gap-3">
                 <div className="min-w-0 text-center">
@@ -188,6 +253,30 @@ export function NowPlayingExpanded() {
                 >
                   <RepeatIcon size={20} />
                 </button>
+              </div>
+
+              <div className="mt-5 flex w-full max-w-xs items-center gap-3">
+                <button
+                  onClick={toggleMute}
+                  className="shrink-0 text-muted transition-colors hover:text-fg"
+                  aria-label={volume === 0 ? "Unmute" : "Mute"}
+                >
+                  {volume === 0 ? <VolumeX size={18} /> : <Volume2 size={18} />}
+                </button>
+                <input
+                  type="range"
+                  min={0}
+                  max={1}
+                  step={0.01}
+                  value={volume}
+                  onChange={(e) => setVolume(Number(e.target.value))}
+                  className="tb-range h-3 flex-1"
+                  style={{ "--fill-pct": `${volume * 100}%` } as React.CSSProperties}
+                  aria-label="Volume"
+                />
+                <span className="w-8 shrink-0 text-right text-xs tabular-nums text-muted">
+                  {Math.round(volume * 100)}
+                </span>
               </div>
             </div>
 
