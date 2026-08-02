@@ -69,7 +69,9 @@ export function TopBar() {
   }
 
   return (
-    <header className="flex h-16 shrink-0 items-center justify-between gap-4 bg-base px-6">
+    // Transparent so the ambient wash reaches the top of the panel. An opaque
+    // fill here would clip the gradient to below the search bar.
+    <header className="relative flex h-16 shrink-0 items-center justify-between gap-4 px-6">
       <div className="flex items-center gap-2">
         <button
           onClick={() => navigate(-1)}

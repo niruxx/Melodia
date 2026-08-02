@@ -63,7 +63,11 @@ export function Card({ collection, onPlay }: CardProps) {
       onKeyDown={(e) => {
         if (e.key === "Enter" || e.key === " ") navigate(`/playlist/${collection.id}`);
       }}
-      className="group w-40 shrink-0 cursor-pointer rounded-lg bg-surface p-4 text-left shadow-md transition-colors duration-200 hover:bg-surface-2 hover:shadow-xl hover:shadow-black/40 sm:w-44"
+      // Slightly translucent so the ambient wash reads through and the cards
+      // sit *in* the background rather than on top of it. Deliberately no
+      // backdrop-blur: a shelf holds ~20 of these and blurring each one is a
+      // real cost for an effect the tint already achieves.
+      className="group w-40 shrink-0 cursor-pointer rounded-lg border border-border/60 bg-surface/80 p-4 text-left shadow-md transition-colors duration-200 hover:border-border hover:bg-surface-2/90 hover:shadow-xl hover:shadow-black/40 sm:w-44"
     >
       <div className="relative">
         <CoverArt

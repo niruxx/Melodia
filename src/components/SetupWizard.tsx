@@ -1,10 +1,12 @@
 import { useEffect } from "react";
 import { AnimatePresence, motion } from "framer-motion";
-import { Check, Loader2, Music2, Speaker, Sparkles } from "lucide-react";
+import { Check, Loader2, Speaker, Sparkles } from "lucide-react";
+import { AppIcon } from "./AppIcon";
 import clsx from "clsx";
 import { useSetupStore, SETUP_STEPS } from "../store/setupStore";
 import { useAudioSettingsStore } from "../store/audioSettingsStore";
 import { useVisualizerStore, VISUALIZER_THEMES } from "../store/visualizerStore";
+import { UI_THEMES, useUiThemeStore } from "../store/uiThemeStore";
 import { useAuthStore } from "../store/authStore";
 
 /**
@@ -23,6 +25,8 @@ export function SetupWizard() {
 
   const themeId = useVisualizerStore((s) => s.themeId);
   const setTheme = useVisualizerStore((s) => s.setTheme);
+  const uiThemeId = useUiThemeStore((s) => s.themeId);
+  const setUiTheme = useUiThemeStore((s) => s.setTheme);
 
   const outputDevices = useAudioSettingsStore((s) => s.outputDevices);
   const outputDeviceId = useAudioSettingsStore((s) => s.outputDeviceId);
@@ -61,9 +65,7 @@ export function SetupWizard() {
             <div className="no-scrollbar min-h-0 flex-1 overflow-y-auto p-8">
               {step === "welcome" && (
                 <div className="flex flex-col items-center gap-4 text-center">
-                  <div className="brand-mark flex h-16 w-16 items-center justify-center rounded-2xl text-white">
-                    <Music2 size={30} />
-                  </div>
+                  <AppIcon className="h-16 w-16 rounded-2xl" />
                   <h2 className="text-2xl font-bold">Welcome to TuneBox</h2>
                   <p className="max-w-sm text-sm text-muted">
                     Three quick choices and you're set. You can change any of them later in
@@ -76,10 +78,52 @@ export function SetupWizard() {
                 <div className="flex flex-col gap-4">
                   <div className="flex items-center gap-3">
                     <Sparkles size={20} className="text-accent" />
-                    <h2 className="text-xl font-bold">Pick a visualizer palette</h2>
+                    <h2 className="text-xl font-bold">Choose a look</h2>
                   </div>
+
+                  <p className="text-sm text-muted">App colours — changes apply instantly.</p>
+                  <div className="grid grid-cols-3 gap-2">
+                    {UI_THEMES.map((theme) => (
+                      <button
+                        key={theme.id}
+                        onClick={() => setUiTheme(theme.id)}
+                        aria-pressed={uiThemeId === theme.id}
+                        className={clsx(
+                          "flex flex-col items-center gap-1.5 rounded-lg border p-1.5 transition-colors",
+                          uiThemeId === theme.id
+                            ? "border-accent bg-surface-3"
+                            : "border-transparent bg-surface-3/40 hover:bg-surface-3",
+                        )}
+                      >
+                        <span
+                          className="flex h-9 w-full items-end gap-1 rounded p-1"
+                          style={{
+                            backgroundColor: theme.colors.base,
+                            border: `1px solid ${theme.colors.border}`,
+                          }}
+                        >
+                          <span
+                            className="h-full w-1/3 rounded-sm"
+                            style={{ backgroundColor: theme.colors.black }}
+                          />
+                          <span
+                            className="h-2/3 flex-1 rounded-sm"
+                            style={{ backgroundColor: theme.colors.surface2 }}
+                          />
+                          <span
+                            className="h-3 w-3 shrink-0 self-center rounded-full"
+                            style={{
+                              backgroundImage: `linear-gradient(135deg, ${theme.colors.accent}, ${theme.colors.accent2})`,
+                            }}
+                          />
+                        </span>
+                        <span className="text-[10px] font-semibold">{theme.label}</span>
+                      </button>
+                    ))}
+                  </div>
+
                   <p className="text-sm text-muted">
-                    "Album art" re-tints the spectrum bars to match whatever is playing.
+                    Visualizer bars — "Album art" re-tints them to match whatever is playing.
                   </p>
                   <div className="grid grid-cols-4 gap-2">
                     {VISUALIZER_THEMES.map((theme) => (
@@ -95,7 +139,7 @@ export function SetupWizard() {
                         )}
                       >
                         <span
-                          className="h-10 w-full rounded"
+                          className="h-8 w-full rounded"
                           style={{
                             backgroundImage: theme.colors
                               ? `linear-gradient(to top, ${theme.colors[0]}, ${theme.colors[1]})`
@@ -160,9 +204,7 @@ export function SetupWizard() {
 
               {step === "account" && (
                 <div className="flex flex-col items-center gap-4 text-center">
-                  <div className="brand-mark flex h-14 w-14 items-center justify-center rounded-2xl text-white">
-                    <Music2 size={26} />
-                  </div>
+                  <AppIcon className="h-14 w-14 rounded-2xl" />
                   <h2 className="text-xl font-bold">
                     {isSignedIn ? "You're signed in" : "Connect YouTube Music"}
                   </h2>

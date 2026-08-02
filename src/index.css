@@ -94,6 +94,79 @@ body {
 }
 
 /* ---------------------------------------------------------------- *
+ * Ambient background
+ *
+ * Tinted from `--accent-dynamic-*`, so the wash drifts with the album
+ * art the same way the visualiser does, and from the theme's own
+ * surfaces so it reads correctly on light palettes too.
+ *
+ * `--gradient-strength` is written by `src/store/uiThemeStore.ts`:
+ * 0 disables the effect entirely, and light themes are scaled down
+ * because saturated colour reads far heavier over a pale surface.
+ * ---------------------------------------------------------------- */
+
+@property --gradient-strength {
+  syntax: "<number>";
+  inherits: true;
+  initial-value: 1;
+}
+
+.app-backdrop {
+  position: relative;
+  background-color: var(--color-base);
+  background-image:
+    radial-gradient(
+      118% 78% at 8% -8%,
+      color-mix(in srgb, var(--accent-dynamic-1) calc(26% * var(--gradient-strength)), transparent),
+      transparent 62%
+    ),
+    radial-gradient(
+      96% 68% at 104% 4%,
+      color-mix(in srgb, var(--accent-dynamic-2) calc(20% * var(--gradient-strength)), transparent),
+      transparent 58%
+    ),
+    radial-gradient(
+      140% 90% at 50% 118%,
+      color-mix(in srgb, var(--accent-dynamic-1) calc(12% * var(--gradient-strength)), transparent),
+      transparent 70%
+    );
+  /* Matches the accent transition so the wash cross-fades between tracks
+     instead of snapping. */
+  transition: background-image 700ms ease;
+}
+
+/* A soft top-down darkening keeps text legible where the wash is strongest. */
+.app-backdrop::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: linear-gradient(
+    to bottom,
+    color-mix(in srgb, var(--color-base) 35%, transparent),
+    transparent 28%
+  );
+}
+
+/* Sidebar and player chrome: a barely-there vertical lift so the flat
+   panels read as surfaces rather than cut-outs. */
+.chrome-panel {
+  background-image: linear-gradient(
+    to bottom,
+    color-mix(in srgb, var(--color-fg) calc(4% * var(--gradient-strength)), transparent),
+    transparent 45%
+  );
+}
+
+.chrome-bar {
+  background-image: linear-gradient(
+    to top,
+    color-mix(in srgb, var(--accent-dynamic-1) calc(7% * var(--gradient-strength)), transparent),
+    transparent 70%
+  );
+}
+
+/* ---------------------------------------------------------------- *
  * Keyframes
  * ---------------------------------------------------------------- */
 

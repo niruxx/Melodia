@@ -10,6 +10,7 @@ import {
   Play,
   Repeat,
   Repeat1,
+  Share2,
   Shuffle,
   SkipBack,
   SkipForward,
@@ -25,6 +26,7 @@ import { usePlayerStore } from "../store/playerStore";
 import { useNetworkStore } from "../store/networkStore";
 import { useMiniPlayerStore } from "../store/miniPlayerStore";
 import { useCommentsStore } from "../store/commentsStore";
+import { copyLink, trackShareUrl } from "../lib/share";
 import { formatDuration } from "../lib/format";
 
 const tap = { scale: 0.9 };
@@ -68,7 +70,7 @@ export function NowPlayingBar() {
   const progressPct = duration > 0 ? (progress / duration) * 100 : 0;
 
   return (
-    <div className="flex shrink-0 flex-col bg-black">
+    <div className="chrome-bar flex shrink-0 flex-col border-t border-border/60 bg-black">
       {playbackError && (
         <div className="flex items-center justify-center gap-2 bg-red-500/15 px-4 py-1.5 text-xs text-red-400">
           {playbackError}
@@ -115,6 +117,18 @@ export function NowPlayingBar() {
               >
                 <Heart size={16} fill={liked ? "currentColor" : "none"} />
               </motion.button>
+              {/* Local files have no YouTube Music page to link anyone to. */}
+              {!track.id.startsWith("local:") && (
+                <motion.button
+                  whileTap={tap}
+                  onClick={() => void copyLink(trackShareUrl(track.id), "Song")}
+                  className="shrink-0 text-muted transition-colors hover:text-fg"
+                  aria-label="Copy share link"
+                  title="Copy share link"
+                >
+                  <Share2 size={16} />
+                </motion.button>
+              )}
             </>
           ) : (
             <div className="text-sm text-muted">Nothing playing</div>

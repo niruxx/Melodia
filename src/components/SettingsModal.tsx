@@ -12,21 +12,9 @@ import {
 } from "../store/audioSettingsStore";
 import { usePlayerStore } from "../store/playerStore";
 import { useSetupStore } from "../store/setupStore";
+import { ThemeSettings } from "./ThemeSettings";
 import { useLocalLibraryStore } from "../store/localLibraryStore";
-import {
-  CUSTOM_THEME_ID,
-  VISUALIZER_THEMES,
-  useVisualizerStore,
-  type VisualizerTheme,
-} from "../store/visualizerStore";
 import { APP_VERSION } from "../lib/version";
-
-/** Mirrors the canvas gradient, which runs bottom-to-top. */
-function swatchGradient(theme: VisualizerTheme): string {
-  return theme.colors
-    ? `linear-gradient(to top, ${theme.colors[0]}, ${theme.colors[1]})`
-    : "linear-gradient(to top, var(--accent-dynamic-1), var(--accent-dynamic-2))";
-}
 
 export function SettingsModal() {
   const open = useDiscordStore((s) => s.isSettingsOpen);
@@ -59,11 +47,6 @@ export function SettingsModal() {
   const sleepTimerEndsAt = useAudioSettingsStore((s) => s.sleepTimerEndsAt);
   const startSleepTimer = useAudioSettingsStore((s) => s.startSleepTimer);
   const cancelSleepTimer = useAudioSettingsStore((s) => s.cancelSleepTimer);
-
-  const visualizerThemeId = useVisualizerStore((s) => s.themeId);
-  const visualizerCustom = useVisualizerStore((s) => s.custom);
-  const setVisualizerTheme = useVisualizerStore((s) => s.setTheme);
-  const setVisualizerCustomColor = useVisualizerStore((s) => s.setCustomColor);
 
   const localFolder = useLocalLibraryStore((s) => s.folder);
   const localError = useLocalLibraryStore((s) => s.error);
@@ -363,59 +346,7 @@ export function SettingsModal() {
                 </div>
               </div>
 
-              <div className="mt-2 flex flex-col gap-2">
-                <div className="text-sm font-semibold">Visualizer colours</div>
-                <div className="text-xs text-muted">
-                  Pick a palette for the spectrum bars, or let them keep following the album
-                  artwork.
-                </div>
-
-                <div className="grid grid-cols-4 gap-2">
-                  {[
-                    ...VISUALIZER_THEMES,
-                    // The custom entry previews whatever pair is currently saved.
-                    { id: CUSTOM_THEME_ID, label: "Custom", colors: visualizerCustom },
-                  ].map((theme) => {
-                    const active = visualizerThemeId === theme.id;
-                    return (
-                      <button
-                        key={theme.id}
-                        onClick={() => setVisualizerTheme(theme.id)}
-                        aria-pressed={active}
-                        className={clsx(
-                          "flex flex-col items-center gap-1.5 rounded-lg border p-1.5 transition-colors",
-                          active
-                            ? "border-accent bg-surface-3"
-                            : "border-transparent bg-surface-3/40 hover:bg-surface-3",
-                        )}
-                      >
-                        <span
-                          className="h-8 w-full rounded"
-                          style={{ backgroundImage: swatchGradient(theme) }}
-                        />
-                        <span className="text-[10px] font-semibold text-fg">{theme.label}</span>
-                      </button>
-                    );
-                  })}
-                </div>
-
-                {visualizerThemeId === CUSTOM_THEME_ID && (
-                  <div className="flex items-center gap-4 rounded-lg bg-surface-3 px-3 py-2">
-                    {([0, 1] as const).map((i) => (
-                      <label key={i} className="flex items-center gap-2 text-xs text-muted">
-                        <input
-                          type="color"
-                          value={visualizerCustom[i]}
-                          onChange={(e) => setVisualizerCustomColor(i, e.target.value)}
-                          className="h-7 w-9 cursor-pointer rounded bg-transparent p-0"
-                          aria-label={i === 0 ? "Bottom bar colour" : "Top bar colour"}
-                        />
-                        {i === 0 ? "Bottom" : "Top"}
-                      </label>
-                    ))}
-                  </div>
-                )}
-              </div>
+              <ThemeSettings />
 
               <div className="mt-2 flex items-center justify-between">
                 <div>

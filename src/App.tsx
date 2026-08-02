@@ -43,6 +43,7 @@ import { useThemeStore } from "./store/themeStore";
 import { useVisualizerStore } from "./store/visualizerStore";
 import { useSetupStore } from "./store/setupStore";
 import { useVideoStore } from "./store/videoStore";
+import { useUiThemeStore } from "./store/uiThemeStore";
 import { useAccountStore } from "./store/accountStore";
 
 const routes = [
@@ -81,6 +82,12 @@ function App() {
   const isMini = useMiniPlayerStore((s) => s.active);
 
   useMediaKeys();
+
+  // Applied before anything else paints so the window doesn't flash the
+  // default palette on the way to the saved one.
+  useEffect(() => {
+    useUiThemeStore.getState().init();
+  }, []);
 
   useEffect(() => {
     useAuthStore.getState().init();
@@ -139,9 +146,11 @@ function App() {
         <TitleBar />
         <div className="flex min-h-0 flex-1 gap-2 p-2 pb-0">
           <Sidebar />
-          <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden rounded-lg bg-base">
+          <div className="app-backdrop flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden rounded-lg border border-border/60">
             <TopBar />
-            <main className="min-h-0 flex-1 overflow-y-auto">
+            {/* `relative` lifts the routed content above the backdrop's
+                ::before scrim, which would otherwise sit over it. */}
+            <main className="relative min-h-0 flex-1 overflow-y-auto">
               <AnimatedRoutes />
             </main>
           </div>

@@ -222,25 +222,37 @@ export function Playlist() {
                 home shelves have no YouTube Music page behind them. */}
             {!isLocal && id && !id.startsWith("song-") && (
               <button
-                onClick={(e) => {
-                  const rect = e.currentTarget.getBoundingClientRect();
-                  const url = collectionShareUrl(id);
-                  openMenu(rect.left, rect.bottom + 4, [
+                // Copies straight away: sharing a link is the common case, and
+                // a menu in front of a one-line action is friction. "Open in
+                // YouTube Music" stays available on right-click.
+                onClick={() =>
+                  void copyLink(
+                    collectionShareUrl(id),
+                    collection?.kind === "album" ? "Album" : "Playlist",
+                  )
+                }
+                onContextMenu={(e) => {
+                  e.preventDefault();
+                  openMenu(e.clientX, e.clientY, [
                     {
                       label: "Copy share link",
                       icon: Link2,
-                      onSelect: () => void copyLink(url, collection?.kind === "album" ? "Album" : "Playlist"),
+                      onSelect: () =>
+                        void copyLink(
+                          collectionShareUrl(id),
+                          collection?.kind === "album" ? "Album" : "Playlist",
+                        ),
                     },
                     {
                       label: "Open in YouTube Music",
                       icon: ExternalLink,
-                      onSelect: () => void openLink(url),
+                      onSelect: () => void openLink(collectionShareUrl(id)),
                     },
                   ]);
                 }}
                 className="flex h-10 w-10 items-center justify-center rounded-full text-muted transition-colors hover:bg-surface-2 hover:text-fg"
-                aria-label="Share"
-                title="Share"
+                aria-label="Copy share link"
+                title="Copy share link"
               >
                 <Share2 size={18} />
               </button>

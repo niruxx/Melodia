@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { Copy, Minus, Square, X } from "lucide-react";
+import { AppIcon } from "./AppIcon";
 
 const appWindow = getCurrentWindow();
 
@@ -23,7 +24,7 @@ export function TitleBar() {
       className="flex h-8 shrink-0 select-none items-center justify-between bg-black pl-3"
     >
       <div data-tauri-drag-region className="flex items-center gap-2 text-xs font-semibold text-muted">
-        <div className="brand-mark h-3.5 w-3.5 rounded-sm" />
+        <AppIcon className="h-4 w-4 rounded-sm" />
         TuneBox
       </div>
 

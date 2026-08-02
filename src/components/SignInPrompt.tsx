@@ -1,5 +1,5 @@
-import { Music2 } from "lucide-react";
 import { useAuthStore } from "../store/authStore";
+import { AppIcon } from "./AppIcon";
 
 type SignInPromptProps = {
   title?: string;
@@ -14,9 +14,7 @@ export function SignInPrompt({
 
   return (
     <div className="flex h-full flex-col items-center justify-center gap-4 px-6 py-16 text-center">
-      <div className="brand-mark flex h-16 w-16 items-center justify-center rounded-2xl text-white">
-        <Music2 size={30} />
-      </div>
+      <AppIcon className="h-16 w-16 rounded-2xl" />
       <h2 className="text-xl font-bold">{title}</h2>
       <p className="max-w-sm text-sm text-muted">{message}</p>
       <button

@@ -1,11 +1,12 @@
 import { Reorder, motion, useDragControls } from "framer-motion";
-import { GripVertical, Heart, Pause, Play } from "lucide-react";
+import { GripVertical, Heart, Pause, Play, Share2 } from "lucide-react";
 import clsx from "clsx";
 import { CoverArt } from "./CoverArt";
 import { PlayingBars } from "./PlayingBars";
 import { usePlayerStore } from "../store/playerStore";
 import { useTrackContextMenu } from "../hooks/useTrackContextMenu";
 import { formatDuration } from "../lib/format";
+import { copyLink, trackShareUrl } from "../lib/share";
 import type { Track } from "../lib/mockData";
 
 type TrackRowProps = {
@@ -56,6 +57,7 @@ export function TrackRow({
   const dragControls = useDragControls();
 
   const isCurrent = current?.id === track.id;
+  const isLocal = track.id.startsWith("local:");
 
   function handleRowClick() {
     if (isCurrent) {
@@ -103,7 +105,7 @@ export function TrackRow({
 
       {showAlbum && <div className="hidden truncate text-sm text-muted sm:block">{track.album}</div>}
 
-      <div className="flex items-center gap-4">
+      <div className="flex items-center gap-3">
         <motion.button
           whileTap={{ scale: 0.85 }}
           onClick={(e) => {
@@ -118,6 +120,19 @@ export function TrackRow({
         >
           <Heart size={16} fill={liked ? "currentColor" : "none"} />
         </motion.button>
+        {!isLocal && (
+          <motion.button
+            whileTap={{ scale: 0.85 }}
+            onClick={(e) => {
+              e.stopPropagation();
+              void copyLink(trackShareUrl(track.id), "Song");
+            }}
+            className="text-muted opacity-0 transition-opacity hover:text-fg focus-visible:opacity-100 group-hover:opacity-100"
+            aria-label={`Copy share link for ${track.title}`}
+          >
+            <Share2 size={15} />
+          </motion.button>
+        )}
         <span className="w-10 text-right text-sm tabular-nums text-muted">
           {formatDuration(track.duration)}
         </span>

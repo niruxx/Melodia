@@ -9,6 +9,7 @@ import { useSourceStore, type MusicSource } from "../store/sourceStore";
 import { useLocalLibraryStore } from "../store/localLibraryStore";
 import { usePlaylistModalStore } from "../store/playlistModalStore";
 import { CoverArt } from "./CoverArt";
+import { AppIcon } from "./AppIcon";
 
 const navItems = [
   { to: "/", label: "Home", icon: Home, end: true },
@@ -50,9 +51,9 @@ export function Sidebar() {
   }
 
   return (
-    <aside className="flex h-full min-h-0 w-72 shrink-0 flex-col gap-2 bg-black px-2 py-2">
+    <aside className="chrome-panel flex h-full min-h-0 w-72 shrink-0 flex-col gap-2 bg-black px-2 py-2">
       <div className="flex items-center gap-2 px-3 py-2">
-        <div className="brand-mark h-7 w-7 rounded-md" />
+        <AppIcon className="h-7 w-7 rounded-md" />
         <span className="text-lg font-bold tracking-tight">TuneBox</span>
       </div>
 
