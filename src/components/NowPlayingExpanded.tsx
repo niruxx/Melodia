@@ -24,6 +24,7 @@ import { VideoLayer } from "./VideoLayer";
 import { useVideoStore } from "../store/videoStore";
 import { usePlayerStore } from "../store/playerStore";
 import { useAuthStore } from "../store/authStore";
+import { useSourceStore } from "../store/sourceStore";
 import { formatDuration } from "../lib/format";
 import { getLyrics } from "../lib/ytmusic";
 
@@ -79,8 +80,22 @@ export function NowPlayingExpanded() {
     error: null,
   });
 
+  // Lyrics are a YouTube Music lookup keyed by videoId, so they mean nothing
+  // here twice over: Local mode is a deliberate "don't talk to YouTube"
+  // setting, and a local file's id is a file path rather than a videoId. The
+  // panel is dropped entirely instead of showing an empty one — same reasoning
+  // as `canShowVideo` above.
+  const isLocalMode = useSourceStore((s) => s.active === "local");
+  const canShowLyrics = Boolean(track && !isLocalMode && !track.id.startsWith("local:"));
+
   useEffect(() => {
-    if (!isExpanded || !track || !isSignedIn) return;
+    if (!isExpanded || !track) return;
+    if (!canShowLyrics || !isSignedIn) {
+      // Nothing to fetch — and the previous track's lyrics must not linger
+      // behind a local one, or they'd reappear on the way back out.
+      setLyricsState({ loading: false, lyrics: null, source: null, error: null });
+      return;
+    }
     let cancelled = false;
     setLyricsState({ loading: true, lyrics: null, source: null, error: null });
     getLyrics(track.id)
@@ -93,7 +108,7 @@ export function NowPlayingExpanded() {
     return () => {
       cancelled = true;
     };
-  }, [isExpanded, track?.id, isSignedIn]);
+  }, [isExpanded, track?.id, isSignedIn, canShowLyrics]);
 
   return (
     <AnimatePresence>
@@ -280,41 +295,51 @@ export function NowPlayingExpanded() {
               </div>
             </div>
 
-            <div className="flex h-[60vh] w-full min-w-[16rem] max-w-sm shrink-0 flex-col rounded-xl bg-black/30 p-6 backdrop-blur md:h-[70vh]">
-              <h3 className="mb-4 shrink-0 text-xs font-semibold uppercase tracking-wider text-muted">
-                Lyrics
-              </h3>
-              <div className="no-scrollbar min-h-0 flex-1 overflow-y-auto">
-                {!isSignedIn && (
-                  <p className="text-sm text-muted">Sign in to load lyrics.</p>
-                )}
-                {isSignedIn && lyricsState.loading && (
-                  <div className="flex flex-col gap-3">
-                    {["w-full", "w-11/12", "w-4/5", "w-full", "w-3/4", "w-5/6", "w-2/3", "w-full"].map(
-                      (w, i) => (
+            {canShowLyrics && (
+              <div className="flex h-[60vh] w-full min-w-[16rem] max-w-sm shrink-0 flex-col rounded-xl bg-black/30 p-6 backdrop-blur md:h-[70vh]">
+                <h3 className="mb-4 shrink-0 text-xs font-semibold uppercase tracking-wider text-muted">
+                  Lyrics
+                </h3>
+                <div className="no-scrollbar min-h-0 flex-1 overflow-y-auto">
+                  {!isSignedIn && <p className="text-sm text-muted">Sign in to load lyrics.</p>}
+                  {isSignedIn && lyricsState.loading && (
+                    <div className="flex flex-col gap-3">
+                      {[
+                        "w-full",
+                        "w-11/12",
+                        "w-4/5",
+                        "w-full",
+                        "w-3/4",
+                        "w-5/6",
+                        "w-2/3",
+                        "w-full",
+                      ].map((w, i) => (
                         <Skeleton key={i} className={clsx("h-3.5", w)} />
-                      ),
+                      ))}
+                    </div>
+                  )}
+                  {isSignedIn && !lyricsState.loading && lyricsState.error && (
+                    <p className="text-sm text-red-400">{lyricsState.error}</p>
+                  )}
+                  {isSignedIn &&
+                    !lyricsState.loading &&
+                    !lyricsState.error &&
+                    !lyricsState.lyrics && (
+                      <p className="text-sm text-muted">Lyrics not available for this song.</p>
                     )}
-                  </div>
-                )}
-                {isSignedIn && !lyricsState.loading && lyricsState.error && (
-                  <p className="text-sm text-red-400">{lyricsState.error}</p>
-                )}
-                {isSignedIn && !lyricsState.loading && !lyricsState.error && !lyricsState.lyrics && (
-                  <p className="text-sm text-muted">Lyrics not available for this song.</p>
-                )}
-                {lyricsState.lyrics && (
-                  <>
-                    <p className="whitespace-pre-line text-sm leading-relaxed text-fg/90">
-                      {lyricsState.lyrics}
-                    </p>
-                    {lyricsState.source && (
-                      <p className="mt-4 text-xs text-muted">{lyricsState.source}</p>
-                    )}
-                  </>
-                )}
+                  {lyricsState.lyrics && (
+                    <>
+                      <p className="whitespace-pre-line text-sm leading-relaxed text-fg/90">
+                        {lyricsState.lyrics}
+                      </p>
+                      {lyricsState.source && (
+                        <p className="mt-4 text-xs text-muted">{lyricsState.source}</p>
+                      )}
+                    </>
+                  )}
+                </div>
               </div>
-            </div>
+            )}
           </div>
         </motion.div>
       )}
