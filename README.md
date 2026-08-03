@@ -376,6 +376,84 @@ its Application ID in to make presence work in your build.
 </details>
 
 <details>
+<summary><b>Clearing Melodia's cache</b></summary>
+
+<br>
+
+There's no button for this in the app — Melodia keeps its data in two ordinary
+folders, so clearing it is a matter of deleting the right one. Pick the smallest
+level that fixes your problem.
+
+| Level | Clears | You keep | You lose |
+|---|---|---|---|
+| **1. Cached art and pages** | ~80 MB of downloaded images and compiled scripts | Everything | Nothing — it re-downloads |
+| **2. Settings** | Theme, EQ, quality, toggles, "skip this version" | Your sign-in and local folder | Every preference; the setup guide runs again |
+| **3. Everything** | Both folders | Nothing | Preferences *and* sign-in |
+
+**Step 1 — quit Melodia properly.**
+
+If **Keep playing in the background** is on, closing the window only hides it and
+the files stay locked. Right-click the tray icon → **Quit**. To confirm nothing
+is left running:
+
+```powershell
+Get-Process melodia -ErrorAction SilentlyContinue    # prints nothing when closed
+```
+
+**Step 2 — delete the folder for the level you want.** On Windows, paste into
+PowerShell:
+
+```powershell
+# Level 1 — cached art and pages only
+Remove-Item "$env:LOCALAPPDATA\com.melodia.app\EBWebView\Default\Cache",
+            "$env:LOCALAPPDATA\com.melodia.app\EBWebView\Default\Code Cache" `
+            -Recurse -Force -ErrorAction SilentlyContinue
+
+# Level 2 — settings (adds the above)
+Remove-Item "$env:LOCALAPPDATA\com.melodia.app" -Recurse -Force
+
+# Level 3 — everything, including your sign-in
+Remove-Item "$env:LOCALAPPDATA\com.melodia.app" -Recurse -Force
+Remove-Item "$env:APPDATA\com.melodia.app" -Recurse -Force
+```
+
+**Step 3 — start Melodia again.** It recreates whatever it needs. After level 2
+or 3 the first-run setup guide reappears, which is expected.
+
+<br>
+
+**Where the two folders are**
+
+| | Windows | macOS | Linux |
+|---|---|---|---|
+| Settings & cached art | `%LOCALAPPDATA%\com.melodia.app` | `~/Library/Caches/com.melodia.app` | `~/.cache/com.melodia.app` |
+| Sign-in & app data | `%APPDATA%\com.melodia.app` | `~/Library/Application Support/com.melodia.app` | `~/.local/share/com.melodia.app` |
+
+Windows paths are the tested ones; the others are the platform conventions
+Tauri follows, on platforms where Melodia itself hasn't been verified.
+
+**What's in the app-data folder**, if you'd rather delete one thing than all of
+it:
+
+| File | Holds | Deleting it means |
+|---|---|---|
+| `ytmusic_browser.json` | Your Google session | Signed out |
+| `ytmusic_oauth.json` / `ytmusic_config.json` | The OAuth fallback's token and client | The OAuth sign-in is forgotten |
+| `ytdlp_cookies.txt` | The cookie jar for age-restricted songs | Rebuilt on demand; harmless |
+| `ytdlp_auth.json` | Whether that setting is on | Reverts to off |
+| `local_library.json` | Your local music folder and its scan | Re-pick the folder |
+| `sidecar.log` | The Python helper's log | Nothing — it's a diagnostic |
+
+> [!NOTE]
+> Uninstalling Melodia leaves both folders behind, so a reinstall keeps your
+> sign-in and settings. Deleting them is the only full reset.
+>
+> None of this relates to the build-time asset cache, which only exists if you
+> compile from source — see [Building from source](#building-from-source).
+
+</details>
+
+<details>
 <summary><b>Keyboard shortcuts</b></summary>
 
 <br>
@@ -440,7 +518,11 @@ it does nothing when everything already matches.
    `src-tauri/tauri.conf.json` and [`src/lib/version.ts`](src/lib/version.ts) —
    all four, or the update banner compares against the wrong number.
 2. `npm run tauri build`.
-3. Publish a GitHub release whose **tag is a plain `MAJOR.MINOR.PATCH`** (a `v`
+3. **Launch the built exe before publishing.** A successful build and a
+   well-formed installer are not proof the app runs — see
+   [asset not found](#building-from-source). Thirty seconds here saves shipping
+   a build that opens to an error message.
+4. Publish a GitHub release whose **tag is a plain `MAJOR.MINOR.PATCH`** (a `v`
    prefix is fine, anything else isn't a version and is ignored by the check),
    with the `.msi` attached. The release body becomes the notes shown in-app.
 
@@ -572,6 +654,33 @@ What the less obvious ones are for:
 | `libayatana-appindicator3` | the tray icon used by background playback |
 | `libxdo` / `xdotool` | tray and global shortcuts on X11 |
 | `libssl` / `openssl` | HTTPS |
+
+</details>
+
+<details>
+<summary><b>If a build launches to "asset not found: index.html"</b></summary>
+
+<br>
+
+The frontend is brotli-compressed into
+`src-tauri/target/<profile>/build/melodia-*/out/tauri-codegen-assets/`, one file
+per asset, each named after the hash of that asset's **source** content. Tauri
+looks an entry up by that hash and, if a file is already there, embeds it
+without checking that it is intact.
+
+A build interrupted mid-write — Ctrl+C, or an antivirus or indexer holding the
+file — can leave a **zero-byte entry**. Every later build then embeds an empty
+asset, reports success, and produces an installer that launches to that message
+with no UI to fix it from. `cargo clean` does not help: the cache lives in the
+build script's `OUT_DIR` and survives it.
+
+`npm run tauri build` now runs [`scripts/clean-asset-cache.js`](scripts/clean-asset-cache.js)
+first, which drops any empty entry so the next build regenerates it. Only broken
+entries go, so the cache keeps doing its job. To clear the whole thing by hand:
+
+```bash
+npm run clean:assets
+```
 
 </details>
 
