@@ -9,19 +9,28 @@
 Real playback, your real playlists, and a UI you can make your own.
 
 <p>
+<img alt="Version" src="https://img.shields.io/badge/version-1.0.0-7c5cff?style=flat-square" />
 <img alt="Windows" src="https://img.shields.io/badge/Windows-tested-2ea44f?style=flat-square&logo=windows&logoColor=white" />
 <img alt="macOS" src="https://img.shields.io/badge/macOS-untested-8a8a8a?style=flat-square&logo=apple&logoColor=white" />
 <img alt="Linux" src="https://img.shields.io/badge/Linux-untested-8a8a8a?style=flat-square&logo=linux&logoColor=white" />
 </p>
 
 <p>
-<img alt="Version" src="https://img.shields.io/badge/version-0.5.0-7c5cff?style=flat-square" />
 <img alt="Tauri" src="https://img.shields.io/badge/Tauri-2-24C8DB?style=flat-square&logo=tauri&logoColor=white" />
 <img alt="React" src="https://img.shields.io/badge/React-19-61DAFB?style=flat-square&logo=react&logoColor=black" />
 <img alt="Rust" src="https://img.shields.io/badge/Rust-audio_engine-CE422B?style=flat-square&logo=rust&logoColor=white" />
+<img alt="Python" src="https://img.shields.io/badge/Python-sidecar-3776AB?style=flat-square&logo=python&logoColor=white" />
 </p>
 
 <img src="docs/screenshot.png" alt="Melodia home screen" width="900" />
+
+<sub>
+
+**[Install](#install)** · **[Features](#features)** · **[Signing in](#signing-in)** ·
+**[Everyday use](#everyday-use)** · **[Updates](#updates)** ·
+**[Building from source](#building-from-source)** · **[Limitations](#known-limitations)**
+
+</sub>
 
 </div>
 
@@ -39,6 +48,40 @@ It also plays music straight off your disk, so it works with no account at all.
 > [!NOTE]
 > Melodia is an independent project and is not affiliated with, endorsed by, or
 > connected to Google or YouTube.
+
+### New in 1.0
+
+- **Guided Python setup** — the first-run wizard finds Python, offers to install
+  it, and runs `pip` for you. No terminal required to get playback working.
+- **Update notifications** — a quiet banner when a newer release exists, with
+  the release notes in-app. Nothing installs itself.
+- **In-place MSI upgrades** — new versions install over the old one.
+- **Suggested shelf** on Home, reshuffling every 15 seconds.
+- **Album-art wallpaper** — the whole window tinted by your library's artwork.
+- **Age-restricted songs** can now play, behind an opt-in setting.
+
+---
+
+## Install
+
+**Windows** — download the `.msi` from the
+[latest release](https://github.com/niruxx/Melodia/releases/latest) and run it.
+Upgrades install straight over an existing copy; your settings are kept.
+
+**macOS and Linux** — no builds are published yet.
+[Build from source](#building-from-source); everything the app needs is
+cross-platform, it simply hasn't been verified there.
+
+> [!IMPORTANT]
+> **Melodia needs Python 3.9+ on the machine to talk to YouTube Music.** The
+> installer bundles the helper script, but not an interpreter. The first-run
+> setup guide checks for one, offers to install it, and installs the packages
+> itself — see [Python, handled for you](#python-handled-for-you). Local file
+> playback works without any of this.
+
+> [!WARNING]
+> Installers are unsigned, so Windows SmartScreen will warn on first run.
+> Choose **More info → Run anyway**.
 
 ---
 
@@ -59,8 +102,8 @@ It also plays music straight off your disk, so it works with no account at all.
 
 <div align="center"><sub><b>Settings</b> — audio output, quality, equalizer, themes, and more</sub></div>
 
-<!-- More captures. Uncomment a row once the file exists — docs/CAPTURE.md has
-     the shot list, sizes, and how to record the GIF.
+<!-- Gallery slots waiting on captures. Uncomment a block once the file exists;
+     docs/CAPTURE.md has the shot list, window size and GIF recipe.
 
 <p align="center"><img src="docs/demo.gif" alt="Melodia in motion" width="900" /></p>
 <p align="center"><sub>Browsing, playing, and re-theming on the fly</sub></p>
@@ -68,11 +111,11 @@ It also plays music straight off your disk, so it works with no account at all.
 <table>
 <tr>
 <td width="50%"><img src="docs/themes.png" alt="Themes" /></td>
-<td width="50%"><img src="docs/comments.png" alt="Comments" /></td>
+<td width="50%"><img src="docs/wallpaper.png" alt="Album-art wallpaper" /></td>
 </tr>
 <tr>
 <td align="center"><b>Themes</b><br/><sub>Six palettes, custom accents, visualizer colours</sub></td>
-<td align="center"><b>Comments</b><br/><sub>Read a song's YouTube comments without leaving</sub></td>
+<td align="center"><b>Album-art wallpaper</b><br/><sub>The window takes its colour from your library</sub></td>
 </tr>
 </table>
 -->
@@ -122,6 +165,7 @@ It also plays music straight off your disk, so it works with no account at all.
 - Create, rename and delete playlists
 - Add, remove and reorder songs
 - Liked Songs, always pinned
+- Suggested shelf that keeps cycling
 - Lyrics in the fullscreen player
 - Copy a share link for any song or playlist
 
@@ -141,221 +185,10 @@ It also plays music straight off your disk, so it works with no account at all.
 - Discord Rich Presence
 - Play on another device on your network
 - One-click Google sign-in — no API keys
+- Update notifications from GitHub
 
 </td></tr>
 </table>
-
----
-
-## Getting started
-
-You'll need **[Node.js](https://nodejs.org/) 18+**, **[Rust](https://www.rust-lang.org/tools/install)**,
-and **[Python 3](https://www.python.org/)**. Platform build tools are listed
-[below](#platform-requirements).
-
-```bash
-git clone https://github.com/niruxx/Melodia.git
-cd Melodia
-
-npm install                              # frontend dependencies
-pip install -r sidecar/requirements.txt  # YouTube Music helper
-
-npm run tauri dev                        # run it
-```
-
-To produce installers instead:
-
-```bash
-npm run tauri build
-```
-
-Artifacts land in `src-tauri/target/release/bundle/`:
-
-| Platform | You get |
-|---|---|
-| Windows | `.msi` only — see [Releases and updates](#releases-and-updates) |
-| macOS | `.dmg` and `.app` |
-| Linux | `.deb`, `.rpm` and `.AppImage` |
-
-Tauri builds only for the machine it runs on — there's no cross-compiling, so
-each platform must be built on that platform.
-
-> [!IMPORTANT]
-> **Python is needed to run Melodia, not just to build it.** The installer
-> bundles the helper script, but the machine still needs Python 3.9+ plus the
-> packages in `sidecar/requirements.txt`. The first-run setup guide checks for
-> both and installs the packages itself, so an end user doesn't have to touch a
-> terminal — see below.
-
-<details>
-<summary><b>How the setup guide provisions Python</b></summary>
-
-<br>
-
-The **Set up the music service** step of the first-run guide probes every
-interpreter Melodia would use, and asks each one to import the helper's packages
-rather than just checking that it launches. It reports the two halves
-separately, each with its own fix:
-
-| Check | If it fails |
-| --- | --- |
-| **Python** | **Get Python** — opens the [Python Install Manager](https://apps.microsoft.com/detail/9NQ7512CXL7T) in the Microsoft Store on Windows (per-user, no administrator), or python.org elsewhere |
-| **Helper packages** | **Install** — runs `pip install -r sidecar/requirements.txt` against the detected interpreter, streaming pip's output into the step |
-
-The pip run is always available, including when the check is happy — it becomes
-**Run pip again**, so a machine that is broken in a way the check can't see can
-still be repaired from the UI. A system-wide interpreter that refuses to be
-written to is retried per-user (`--user`) rather than asking for elevation. Once
-an install succeeds the sidecar picks it up on its next call, so nothing needs
-restarting.
-
-`sidecar/requirements.txt` ships inside the installer (it's a Tauri resource,
-alongside `main.py`) *and* is compiled into the binary, so pip has something to
-work from even if the installed copy goes missing.
-
-The step is skippable — Melodia still plays local files without it — and it
-reopens on the next launch for as long as the helper can't run. It's also
-reachable any time from **Settings → Check the music service helper**.
-
-</details>
-
-<details>
-<summary><b>If a machine reports Python helper trouble</b></summary>
-
-<br>
-
-The helper is supervised: it's started on demand, restarted automatically if it
-ever stops, and the interrupted request is retried, so a one-off death is
-invisible. Anything it can't recover from leaves a trace in **`sidecar.log`**,
-in Melodia's app data folder (`%APPDATA%\com.melodia.app` on Windows).
-
-Melodia tries `python`, `python3` and `py` in turn, then the per-user locations
-the Windows installers use, and checks that each one *answers* rather than
-merely launching — so the Microsoft Store `python.exe` placeholder, and
-interpreters that are missing the packages, are skipped in favour of one that
-works. If none does, the error names each interpreter and why it was rejected.
-Installing Python fixes it without restarting the app.
-
-</details>
-
----
-
-## Releases and updates
-
-Melodia checks **GitHub Releases once per launch** and, if a newer version is
-published, shows a one-line banner under the top bar. Clicking it opens that
-release's notes with a **Download** button; the × puts it away until the next
-launch, and **Skip this version** silences that release for good.
-
-Nothing is downloaded or installed automatically — the check is a single request
-to `api.github.com`, and **Settings → Check for updates automatically** turns
-even that off. Settings also has **Check now** and the notes for whatever version
-you're on.
-
-**Windows ships as an MSI only.** The MSI is configured for in-place upgrades: a
-pinned `upgradeCode` in [`tauri.conf.json`](src-tauri/tauri.conf.json) plus the
-bundler's `<MajorUpgrade>` rule mean running a newer installer replaces the
-existing install — no uninstall step, and settings are kept. That only holds if
-the upgrade code never changes, which is exactly why it's pinned rather than
-left to be derived from the product name. Verify it any time with:
-
-```bash
-npm run tauri inspect wix-upgrade-code
-```
-
-> [!NOTE]
-> Anyone still on the old NSIS `.exe` build has to uninstall it by hand once —
-> the two installer families don't know about each other, and side by side they
-> leave two entries in Add/Remove Programs.
-
-**Cutting a release**
-
-1. Bump the version in `package.json`, `src-tauri/Cargo.toml`,
-   `src-tauri/tauri.conf.json` and [`src/lib/version.ts`](src/lib/version.ts) —
-   all four, or the update banner compares against the wrong number.
-2. `npm run tauri build`.
-3. Publish a GitHub release whose **tag is a plain `MAJOR.MINOR.PATCH`** (a `v`
-   prefix is fine, anything else isn't a version and is ignored by the check),
-   with the `.msi` attached. The release body becomes the notes shown in-app.
-
-**After an upgrade**, the first launch re-runs `pip install -r requirements.txt`
-against the detected interpreter and shows it in the setup step. An import check
-alone can't tell whether a bumped requirement is satisfied — only pip can, and
-it does nothing when everything already matches.
-
----
-
-## Platform requirements
-
-<details>
-<summary><b>Windows</b></summary>
-
-<br>
-
-Install [Microsoft C++ Build Tools](https://visualstudio.microsoft.com/visual-cpp-build-tools/)
-with the **Desktop development with C++** workload — Rust needs it to link.
-
-WebView2 ships with Windows 10 and 11. On older builds, install the
-[Evergreen runtime](https://developer.microsoft.com/microsoft-edge/webview2/).
-
-</details>
-
-<details>
-<summary><b>macOS</b></summary>
-
-<br>
-
-```bash
-xcode-select --install   # Apple's command line tools
-brew install python      # if you don't already have python3
-```
-
-Everything else comes with the system — WKWebView for the UI, CoreAudio for
-playback.
-
-</details>
-
-<details>
-<summary><b>Linux</b></summary>
-
-<br>
-
-**Debian / Ubuntu**
-
-```bash
-sudo apt update
-sudo apt install -y build-essential curl wget file \
-  libwebkit2gtk-4.1-dev librsvg2-dev libssl-dev \
-  libayatana-appindicator3-dev libxdo-dev \
-  libasound2-dev python3 python3-pip
-```
-
-**Fedora**
-
-```bash
-sudo dnf install -y @development-tools webkit2gtk4.1-devel librsvg2-devel \
-  openssl-devel libappindicator-gtk3-devel libxdo-devel \
-  alsa-lib-devel python3 python3-pip
-```
-
-**Arch**
-
-```bash
-sudo pacman -S --needed base-devel webkit2gtk-4.1 librsvg openssl \
-  libayatana-appindicator xdotool alsa-lib python python-pip
-```
-
-What the less obvious ones are for:
-
-| Package | Needed for |
-|---|---|
-| `libwebkit2gtk-4.1` | the webview the UI renders in |
-| `libasound2` / `alsa-lib` | audio output — rodio/cpal build against ALSA |
-| `libayatana-appindicator3` | the tray icon used by background playback |
-| `libxdo` / `xdotool` | tray and global shortcuts on X11 |
-| `libssl` / `openssl` | HTTPS |
-
-</details>
 
 ---
 
@@ -374,7 +207,7 @@ anything, and loads your library.
 > Melodia re-checks at startup and prompts you if yours has lapsed.
 
 <details>
-<summary><b>Age-restricted songs: <b>Settings → Play age-restricted songs</b></b></summary>
+<summary><b>Age-restricted songs — Settings → Play age-restricted songs</b></summary>
 
 <br>
 
@@ -422,6 +255,60 @@ OAuth sessions refresh silently, so this needs re-authenticating less often.
 
 ---
 
+## Python, handled for you
+
+Melodia talks to YouTube Music through a small Python helper (`sidecar/main.py`,
+wrapping [ytmusicapi](https://github.com/sigma67/ytmusicapi) and
+[yt-dlp](https://github.com/yt-dlp/yt-dlp)). It needs an interpreter *and* the
+packages in `sidecar/requirements.txt` — neither of which an installer can
+assume is present.
+
+The **Set up the music service** step of the first-run guide handles both. It
+probes every interpreter Melodia would use, asking each one to import the
+helper's packages rather than just checking that it launches, and reports the
+two halves separately:
+
+| Check | If it fails |
+| --- | --- |
+| **Python** | **Get Python** — opens the [Python Install Manager](https://apps.microsoft.com/detail/9NQ7512CXL7T) in the Microsoft Store on Windows (per-user, no administrator), or python.org elsewhere |
+| **Helper packages** | **Install** — runs `pip install -r sidecar/requirements.txt` against the detected interpreter, streaming pip's output into the step |
+
+The pip run is always available, including when the check is happy — it becomes
+**Run pip again**, so a machine that is broken in a way the check can't see can
+still be repaired from the UI. A system-wide interpreter that refuses to be
+written to is retried per-user (`--user`) rather than asking for elevation. Once
+an install succeeds the sidecar picks it up on its next call, so nothing needs
+restarting.
+
+The step is skippable — Melodia still plays local files without it — and it
+reopens on the next launch for as long as the helper can't run. It's also
+reachable any time from **Settings → Check the music service helper**.
+
+<details>
+<summary><b>If a machine reports Python helper trouble</b></summary>
+
+<br>
+
+The helper is supervised: it's started on demand, restarted automatically if it
+ever stops, and the interrupted request is retried, so a one-off death is
+invisible. Anything it can't recover from leaves a trace in **`sidecar.log`**,
+in Melodia's app data folder (`%APPDATA%\com.melodia.app` on Windows).
+
+Melodia tries `python`, `python3` and `py` in turn, then the per-user locations
+the Windows installers use, and checks that each one *answers* rather than
+merely launching — so the Microsoft Store `python.exe` placeholder, and
+interpreters that are missing the packages, are skipped in favour of one that
+works. If none does, the error names each interpreter and why it was rejected.
+Installing Python fixes it without restarting the app.
+
+`sidecar/requirements.txt` ships inside the installer (a Tauri resource,
+alongside `main.py`) *and* is compiled into the binary, so pip has something to
+work from even if the installed copy goes missing.
+
+</details>
+
+---
+
 ## Everyday use
 
 <details>
@@ -450,6 +337,23 @@ hides it to the tray instead of quitting.
 - **Right-click** for Previous / Play-Pause / Next, and **Quit**
 
 Quitting from the tray is how you actually exit while this is on.
+
+</details>
+
+<details>
+<summary><b>Making it look how you want</b></summary>
+
+<br>
+
+Everything lives in **Settings → Theme**:
+
+| Control | What it does |
+|---|---|
+| **App colours** | Six palettes. Repaints every surface at runtime. |
+| **Accent** | Your own two-colour pair, kept when you switch palettes. |
+| **Background wash** | The ambient gradient that drifts with the current track's artwork — Off / Subtle / Vivid, and optionally extended across the sidebar. |
+| **Album-art wallpaper** | Fills the window behind the app with artwork from your library, blurred right back and changing every minute. Off by default. |
+| **Visualizer colours** | A palette for the spectrum bars, or let them follow the artwork. |
 
 </details>
 
@@ -497,6 +401,57 @@ Your keyboard's media keys work too.
 
 ---
 
+## Updates
+
+Melodia checks **GitHub Releases once per launch** and, if a newer version is
+published, shows a one-line banner under the top bar. Clicking it opens that
+release's notes with a **Download** button; the × puts it away until the next
+launch, and **Skip this version** silences that release for good.
+
+Nothing is downloaded or installed automatically — the check is a single request
+to `api.github.com`, and **Settings → Check for updates automatically** turns
+even that off. Settings also has **Check now** and the notes for whatever version
+you're on.
+
+**Windows ships as an MSI only.** The MSI is configured for in-place upgrades: a
+pinned `upgradeCode` in [`tauri.conf.json`](src-tauri/tauri.conf.json) plus the
+bundler's `<MajorUpgrade>` rule mean running a newer installer replaces the
+existing install — no uninstall step, and settings are kept. That only holds if
+the upgrade code never changes, which is exactly why it's pinned rather than
+left to be derived from the product name. Verify it any time with
+`npm run tauri inspect wix-upgrade-code`.
+
+> [!NOTE]
+> Anyone still on a pre-1.0 NSIS `.exe` build has to uninstall it by hand once —
+> the two installer families don't know about each other, and side by side they
+> leave two entries in Add/Remove Programs.
+
+**After an upgrade**, the first launch re-runs `pip install -r requirements.txt`
+against the detected interpreter and shows it in the setup step. An import check
+alone can't tell whether a bumped requirement is satisfied — only pip can, and
+it does nothing when everything already matches.
+
+<details>
+<summary><b>Cutting a release</b></summary>
+
+<br>
+
+1. Bump the version in `package.json`, `src-tauri/Cargo.toml`,
+   `src-tauri/tauri.conf.json` and [`src/lib/version.ts`](src/lib/version.ts) —
+   all four, or the update banner compares against the wrong number.
+2. `npm run tauri build`.
+3. Publish a GitHub release whose **tag is a plain `MAJOR.MINOR.PATCH`** (a `v`
+   prefix is fine, anything else isn't a version and is ignored by the check),
+   with the `.msi` attached. The release body becomes the notes shown in-app.
+
+The MSI bundler is stricter than semver about the version string: a pre-release
+identifier must be numeric-only and ≤ 65535, so `1.0.0-1` builds and `1.0.0-rc1`
+does not. Keep any wording in `APP_VERSION` instead.
+
+</details>
+
+---
+
 ## Platform support
 
 | OS | Minimum | Status |
@@ -516,6 +471,129 @@ edges if you try:
 
 ---
 
+## Building from source
+
+You'll need **[Node.js](https://nodejs.org/) 18+**,
+**[Rust](https://www.rust-lang.org/tools/install)**, and
+**[Python 3.9+](https://www.python.org/)**, plus your platform's build tools
+(below).
+
+```bash
+git clone https://github.com/niruxx/Melodia.git
+cd Melodia
+
+npm install                              # frontend dependencies
+pip install -r sidecar/requirements.txt  # YouTube Music helper
+
+npm run tauri dev                        # run it
+```
+
+To produce installers instead:
+
+```bash
+npm run tauri build
+```
+
+Artifacts land in `src-tauri/target/release/bundle/`:
+
+| Platform | You get |
+|---|---|
+| Windows | `.msi` — see [Updates](#updates) for why it's the only one |
+| macOS | `.dmg` and `.app` |
+| Linux | `.deb`, `.rpm` and `.AppImage` |
+
+Tauri builds only for the machine it runs on — there's no cross-compiling, so
+each platform must be built on that platform.
+
+<details>
+<summary><b>Windows build tools</b></summary>
+
+<br>
+
+Install [Microsoft C++ Build Tools](https://visualstudio.microsoft.com/visual-cpp-build-tools/)
+with the **Desktop development with C++** workload — Rust needs it to link.
+
+WebView2 ships with Windows 10 and 11. On older builds, install the
+[Evergreen runtime](https://developer.microsoft.com/microsoft-edge/webview2/).
+
+</details>
+
+<details>
+<summary><b>macOS build tools</b></summary>
+
+<br>
+
+```bash
+xcode-select --install   # Apple's command line tools
+brew install python      # if you don't already have python3
+```
+
+Everything else comes with the system — WKWebView for the UI, CoreAudio for
+playback.
+
+</details>
+
+<details>
+<summary><b>Linux build tools</b></summary>
+
+<br>
+
+**Debian / Ubuntu**
+
+```bash
+sudo apt update
+sudo apt install -y build-essential curl wget file \
+  libwebkit2gtk-4.1-dev librsvg2-dev libssl-dev \
+  libayatana-appindicator3-dev libxdo-dev \
+  libasound2-dev python3 python3-pip
+```
+
+**Fedora**
+
+```bash
+sudo dnf install -y @development-tools webkit2gtk4.1-devel librsvg2-devel \
+  openssl-devel libappindicator-gtk3-devel libxdo-devel \
+  alsa-lib-devel python3 python3-pip
+```
+
+**Arch**
+
+```bash
+sudo pacman -S --needed base-devel webkit2gtk-4.1 librsvg openssl \
+  libayatana-appindicator xdotool alsa-lib python python-pip
+```
+
+What the less obvious ones are for:
+
+| Package | Needed for |
+|---|---|
+| `libwebkit2gtk-4.1` | the webview the UI renders in |
+| `libasound2` / `alsa-lib` | audio output — rodio/cpal build against ALSA |
+| `libayatana-appindicator3` | the tray icon used by background playback |
+| `libxdo` / `xdotool` | tray and global shortcuts on X11 |
+| `libssl` / `openssl` | HTTPS |
+
+</details>
+
+<details>
+<summary><b>Running the tests</b></summary>
+
+<br>
+
+```bash
+npm run build                    # tsc + vite
+cd src-tauri && cargo test       # unit tests, no network or Python needed
+cargo test -- --ignored          # end-to-end: needs Python, packages, network
+```
+
+The `--ignored` set is the useful one when a machine misbehaves: it exercises
+the real Python helper, the interpreter probe, and the GitHub update check
+against live services, and a failure names the cause.
+
+</details>
+
+---
+
 ## Known limitations
 
 Worth knowing before you install:
@@ -525,12 +603,11 @@ Worth knowing before you install:
 | **No lossless streaming** | YouTube Music's best is ~256 kbps AAC. Its higher-bitrate Opus streams use a codec the player can't decode, so streams are always AAC. Lossless applies to local files only. |
 | **Music video mode doesn't work yet** | The stream resolves correctly but doesn't render in the app. Under investigation. |
 | **Installers are unsigned** | Windows SmartScreen will warn on first run. Updates are notified in-app, not installed automatically. |
-| **Age-restricted songs need a setting** | Off by default because it lends yt-dlp your Google session, which YouTube may throttle or invalidate. See [Signing in](#signing-in). |
+| **Age-restricted songs need a setting** | Off by default, because it lends yt-dlp your Google session — which YouTube may throttle or invalidate. See [Signing in](#signing-in). |
 | **Comments are read-only** | Posting would need a separate Google API and OAuth scopes. |
 | **Tracks buffer before playing** | Roughly 1.5s before audio starts, rather than true progressive streaming. Simpler and more robust; skipping stays responsive because fetching happens off the main thread. |
 | **Sign-in expires** | Cookie sessions last weeks. The OAuth fallback lasts longer. |
 | **Local tracks can't be cast** | "Play on another device" is YouTube-only — the other device doesn't have your file. |
-| **Screenshots are out of date** | They predate the theme system and ambient background. See [docs/CAPTURE.md](docs/CAPTURE.md). |
 | **LAN control is unencrypted** | Beyond the on-device Accept prompt there's no auth. Fine at home; not for untrusted networks. |
 
 ---
@@ -645,7 +722,7 @@ wallpaper is only visible because the surfaces above it stop being opaque.
 - Detail pages share one hero: large artwork tile, uppercase eyebrow, `text-3xl sm:text-4xl` title, count line
 - Cards are `rounded-lg`, and their skeletons must match or content shifts on load
 - Interactions use Framer Motion `whileHover`/`whileTap`, not CSS `hover:scale-*`
-- Overlay stacking: drawer `40` → modals `50` → incoming request `60` → shortcuts `65` → palette `68` → context menu `70`
+- Overlay stacking: drawer `40` → modals `50` → incoming request `60` → shortcuts `65` → palette `68` → context menu / release notes `70` → stream-auth warning `72`
 - Every animation is covered by the global `prefers-reduced-motion` guard
 
 </details>
