@@ -1,5 +1,6 @@
 import { create } from "zustand";
 import { invoke } from "@tauri-apps/api/core";
+import { useStreamAuthStore } from "./streamAuthStore";
 
 const ENABLED_KEY = "melodia:video-mode";
 
@@ -51,7 +52,10 @@ export const useVideoStore = create<VideoStore>((set, get) => ({
       set({ source: { url: res.url, width: res.width, height: res.height }, loadingFor: null });
     } catch (e) {
       if (get().loadingFor !== videoId) return;
-      set({ loadingFor: null, source: null, error: String(e) });
+      const message = String(e);
+      // Same yt-dlp path as audio, so the same push-back can land here first.
+      useStreamAuthStore.getState().reportFailure(message);
+      set({ loadingFor: null, source: null, error: message });
     }
   },
 

@@ -304,6 +304,7 @@ function PythonStep() {
   const log = usePythonStore((s) => s.log);
   const error = usePythonStore((s) => s.error);
   const installerOpened = usePythonStore((s) => s.installerOpened);
+  const afterUpgrade = usePythonStore((s) => s.afterUpgrade);
   const check = usePythonStore((s) => s.check);
   const install = usePythonStore((s) => s.install);
   const openInstaller = usePythonStore((s) => s.openInstaller);
@@ -337,6 +338,13 @@ function PythonStep() {
         Melodia talks to YouTube Music through a small Python helper. Signing in, search and
         playlists all need it — local files don't.
       </p>
+
+      {afterUpgrade && (
+        <p className="rounded-lg bg-accent/10 px-3 py-2 text-xs text-muted">
+          Melodia was updated, so it&rsquo;s re-checking the helper&rsquo;s packages against this
+          version&rsquo;s requirements. You can carry on — this runs in the background.
+        </p>
+      )}
 
       {/* Two independent checks rather than one verdict: each has its own fix,
           and the second one's fix is worth being able to run on demand even

@@ -12,6 +12,8 @@ import {
 } from "../store/audioSettingsStore";
 import { usePlayerStore } from "../store/playerStore";
 import { useSetupStore } from "../store/setupStore";
+import { useUpdateStore } from "../store/updateStore";
+import { useStreamAuthStore } from "../store/streamAuthStore";
 import { ThemeSettings } from "./ThemeSettings";
 import { useLocalLibraryStore } from "../store/localLibraryStore";
 import { APP_VERSION } from "../lib/version";
@@ -41,6 +43,20 @@ export function SettingsModal() {
   const streamFormat = usePlayerStore((s) => s.streamFormat);
   const restartSetup = useSetupStore((s) => s.restart);
   const openSetupStep = useSetupStore((s) => s.openStep);
+
+  const streamAuthEnabled = useStreamAuthStore((s) => s.enabled);
+  const streamAuthAvailable = useStreamAuthStore((s) => s.available);
+  const streamAuthBusy = useStreamAuthStore((s) => s.busy);
+  const streamAuthError = useStreamAuthStore((s) => s.error);
+  const setStreamAuth = useStreamAuthStore((s) => s.setEnabled);
+
+  const release = useUpdateStore((s) => s.release);
+  const updateChecking = useUpdateStore((s) => s.checking);
+  const updateError = useUpdateStore((s) => s.error);
+  const autoCheckUpdates = useUpdateStore((s) => s.autoCheck);
+  const setAutoCheckUpdates = useUpdateStore((s) => s.setAutoCheck);
+  const checkForUpdates = useUpdateStore((s) => s.check);
+  const openReleaseNotes = useUpdateStore((s) => s.openNotes);
 
   const runInBackground = useAudioSettingsStore((s) => s.runInBackground);
   const setRunInBackground = useAudioSettingsStore((s) => s.setRunInBackground);
@@ -289,6 +305,43 @@ export function SettingsModal() {
                 )}
               </div>
 
+              {/* Hidden entirely without a cookie sign-in: there'd be no
+                  session to lend, so the toggle could only disappoint. */}
+              {streamAuthAvailable && (
+                <div className="mt-2 flex flex-col gap-1.5">
+                  <div className="flex items-center justify-between gap-3">
+                    <div className="min-w-0">
+                      <div className="text-sm font-semibold">Play age-restricted songs</div>
+                      <div className="text-xs text-muted">
+                        Signs in to YouTube as you when resolving audio and video. Without it
+                        those songs fail with &ldquo;Sign in to confirm your age&rdquo;.
+                      </div>
+                    </div>
+                    <button
+                      onClick={() => void setStreamAuth(!streamAuthEnabled)}
+                      disabled={streamAuthBusy}
+                      className={
+                        "shrink-0 rounded-full px-4 py-1.5 text-xs font-semibold transition-colors disabled:opacity-50 " +
+                        (streamAuthEnabled
+                          ? "bg-accent text-black"
+                          : "bg-surface-3 text-fg hover:bg-surface-3/70")
+                      }
+                    >
+                      {streamAuthEnabled ? "On" : "Off"}
+                    </button>
+                  </div>
+                  {streamAuthEnabled && (
+                    <div className="text-xs text-amber-400/90">
+                      YouTube treats signed-in downloads as suspicious. If playback starts
+                      failing or you get signed out of your library, turn this back off.
+                    </div>
+                  )}
+                  {streamAuthError && (
+                    <div className="text-xs text-red-400">{streamAuthError}</div>
+                  )}
+                </div>
+              )}
+
               <div className="mt-2 flex flex-col gap-2">
                 <div className="flex items-center justify-between">
                   <div className="text-sm font-semibold">Equalizer</div>
@@ -348,6 +401,64 @@ export function SettingsModal() {
               </div>
 
               <ThemeSettings />
+
+              <div className="mt-2 flex flex-col gap-1.5">
+                <div className="flex items-center justify-between gap-3">
+                  <div>
+                    <div className="text-sm font-semibold">Check for updates automatically</div>
+                    <div className="text-xs text-muted">
+                      Asks GitHub once per launch whether a newer Melodia exists. Nothing is
+                      downloaded or installed on its own.
+                    </div>
+                  </div>
+                  <button
+                    onClick={() => setAutoCheckUpdates(!autoCheckUpdates)}
+                    className={
+                      "shrink-0 rounded-full px-4 py-1.5 text-xs font-semibold transition-colors " +
+                      (autoCheckUpdates
+                        ? "bg-accent text-black"
+                        : "bg-surface-3 text-fg hover:bg-surface-3/70")
+                    }
+                  >
+                    {autoCheckUpdates ? "On" : "Off"}
+                  </button>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="min-w-0 flex-1 truncate text-xs text-muted">
+                    {updateChecking
+                      ? "Checking…"
+                      : updateError
+                        ? `Couldn't check: ${updateError}`
+                        : !release
+                          ? "Not checked yet."
+                          : release.isNewer
+                            ? `v${release.version} is available.`
+                            : `Up to date (v${release.currentVersion}).`}
+                  </span>
+                  {/* Offered for the current release too, so the notes for what
+                      you're running are never more than two clicks away. */}
+                  {release && (
+                    <button
+                      onClick={openReleaseNotes}
+                      className={
+                        "shrink-0 rounded-full px-4 py-1.5 text-xs font-semibold transition-colors " +
+                        (release.isNewer
+                          ? "bg-accent text-black hover:brightness-110"
+                          : "bg-surface-3 text-fg hover:bg-surface-3/70")
+                      }
+                    >
+                      {release.isNewer ? "What’s new" : "Release notes"}
+                    </button>
+                  )}
+                  <button
+                    onClick={() => void checkForUpdates(true)}
+                    disabled={updateChecking}
+                    className="shrink-0 rounded-full bg-surface-3 px-4 py-1.5 text-xs font-semibold text-fg transition-colors hover:bg-surface-3/70 disabled:opacity-50"
+                  >
+                    Check now
+                  </button>
+                </div>
+              </div>
 
               <div className="mt-2 flex items-center justify-between">
                 <div>

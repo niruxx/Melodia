@@ -111,28 +111,61 @@ body {
   initial-value: 1;
 }
 
-.app-backdrop {
-  position: relative;
-  background-color: var(--color-base);
+/* The wash itself. Worn by the content panel always, and by the sidebar too
+   when the theme setting extends it.
+
+   Written as one shared rule rather than a `--wash` custom property on :root,
+   because a var() nested inside a custom property is substituted where that
+   property is *declared* — so `--wash-scale` set further down the tree would
+   have been silently ignored. Here it's read by a regular property on the
+   element that paints, which is what makes the sidebar's weaker copy work. */
+.app-backdrop,
+.chrome-wash {
   background-image:
     radial-gradient(
       118% 78% at 8% -8%,
-      color-mix(in srgb, var(--accent-dynamic-1) calc(26% * var(--gradient-strength)), transparent),
+      color-mix(
+        in srgb,
+        var(--accent-dynamic-1) calc(26% * var(--gradient-strength) * var(--wash-scale, 1)),
+        transparent
+      ),
       transparent 62%
     ),
     radial-gradient(
       96% 68% at 104% 4%,
-      color-mix(in srgb, var(--accent-dynamic-2) calc(20% * var(--gradient-strength)), transparent),
+      color-mix(
+        in srgb,
+        var(--accent-dynamic-2) calc(20% * var(--gradient-strength) * var(--wash-scale, 1)),
+        transparent
+      ),
       transparent 58%
     ),
     radial-gradient(
       140% 90% at 50% 118%,
-      color-mix(in srgb, var(--accent-dynamic-1) calc(12% * var(--gradient-strength)), transparent),
+      color-mix(
+        in srgb,
+        var(--accent-dynamic-1) calc(12% * var(--gradient-strength) * var(--wash-scale, 1)),
+        transparent
+      ),
       transparent 70%
     );
   /* Matches the accent transition so the wash cross-fades between tracks
      instead of snapping. */
   transition: background-image 700ms ease;
+}
+
+.app-backdrop {
+  position: relative;
+  background-color: var(--color-base);
+}
+
+/* With the artwork wallpaper on, the content panel stops being opaque so the
+   picture behind it reads through. Declared after `.app-backdrop` so it wins
+   on source order — both are single-class selectors. The gradients and the
+   legibility scrim are untouched: they layer over the artwork just as they do
+   over the flat colour. */
+.app-backdrop--sheer {
+  background-color: color-mix(in srgb, var(--color-base) 76%, transparent);
 }
 
 /* A soft top-down darkening keeps text legible where the wash is strongest. */
@@ -156,6 +189,18 @@ body {
     color-mix(in srgb, var(--color-fg) calc(4% * var(--gradient-strength)), transparent),
     transparent 45%
   );
+}
+
+/* The sidebar's opt-in alternative to `.chrome-panel`: the content panel's
+   album-art wash (declared above), carried across so the two read as one
+   surface.
+
+   Held back to two thirds because the sidebar is a narrow column of dense text
+   over a darker base, where the alphas that read as a hint across the content
+   panel read as a stain. Only `background-image` is painted, so the sidebar
+   keeps its own `bg-black` and the panels stay distinguishable. */
+.chrome-wash {
+  --wash-scale: 0.66;
 }
 
 .chrome-bar {

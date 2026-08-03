@@ -109,6 +109,7 @@ It also plays music straight off your disk, so it works with no account at all.
 
 - Six app themes, plus a custom accent
 - Ambient background that drifts with the artwork
+- Optional album-art wallpaper, reshuffled every minute
 - Themeable spectrum visualizer
 - Mini player that stays on top
 - Guided first-run setup
@@ -172,7 +173,7 @@ Artifacts land in `src-tauri/target/release/bundle/`:
 
 | Platform | You get |
 |---|---|
-| Windows | `.msi` and an NSIS `.exe` installer |
+| Windows | `.msi` only — see [Releases and updates](#releases-and-updates) |
 | macOS | `.dmg` and `.app` |
 | Linux | `.deb`, `.rpm` and `.AppImage` |
 
@@ -236,6 +237,51 @@ works. If none does, the error names each interpreter and why it was rejected.
 Installing Python fixes it without restarting the app.
 
 </details>
+
+---
+
+## Releases and updates
+
+Melodia checks **GitHub Releases once per launch** and, if a newer version is
+published, shows a one-line banner under the top bar. Clicking it opens that
+release's notes with a **Download** button; the × puts it away until the next
+launch, and **Skip this version** silences that release for good.
+
+Nothing is downloaded or installed automatically — the check is a single request
+to `api.github.com`, and **Settings → Check for updates automatically** turns
+even that off. Settings also has **Check now** and the notes for whatever version
+you're on.
+
+**Windows ships as an MSI only.** The MSI is configured for in-place upgrades: a
+pinned `upgradeCode` in [`tauri.conf.json`](src-tauri/tauri.conf.json) plus the
+bundler's `<MajorUpgrade>` rule mean running a newer installer replaces the
+existing install — no uninstall step, and settings are kept. That only holds if
+the upgrade code never changes, which is exactly why it's pinned rather than
+left to be derived from the product name. Verify it any time with:
+
+```bash
+npm run tauri inspect wix-upgrade-code
+```
+
+> [!NOTE]
+> Anyone still on the old NSIS `.exe` build has to uninstall it by hand once —
+> the two installer families don't know about each other, and side by side they
+> leave two entries in Add/Remove Programs.
+
+**Cutting a release**
+
+1. Bump the version in `package.json`, `src-tauri/Cargo.toml`,
+   `src-tauri/tauri.conf.json` and [`src/lib/version.ts`](src/lib/version.ts) —
+   all four, or the update banner compares against the wrong number.
+2. `npm run tauri build`.
+3. Publish a GitHub release whose **tag is a plain `MAJOR.MINOR.PATCH`** (a `v`
+   prefix is fine, anything else isn't a version and is ignored by the check),
+   with the `.msi` attached. The release body becomes the notes shown in-app.
+
+**After an upgrade**, the first launch re-runs `pip install -r requirements.txt`
+against the detected interpreter and shows it in the setup step. An import check
+alone can't tell whether a bumped requirement is satisfied — only pip can, and
+it does nothing when everything already matches.
 
 ---
 
@@ -326,6 +372,35 @@ anything, and loads your library.
 > [!TIP]
 > Cookie sessions last weeks, not forever, and a password change ends them.
 > Melodia re-checks at startup and prompts you if yours has lapsed.
+
+<details>
+<summary><b>Age-restricted songs: <b>Settings → Play age-restricted songs</b></b></summary>
+
+<br>
+
+Signing in authenticates **ytmusicapi** — your library, search and playlists.
+Resolving the actual audio is yt-dlp, a separate client that gets no
+credentials, so it reaches YouTube as an anonymous visitor. An anonymous
+visitor can't see age-restricted videos whatever your account's age, which is
+why one song in a working library fails with *"Sign in to confirm your age"*.
+
+The setting lends yt-dlp the same session, which fixes those songs — plus their
+video and comments, which had the same blind spot.
+
+> [!WARNING]
+> It is **off by default and worth leaving off unless you need it**. YouTube
+> treats account cookies used outside a browser as a bot signal. The realistic
+> costs are throttling, *"confirm you're not a bot"* on ordinary tracks, and
+> YouTube invalidating the session — which signs you out of your library too,
+> since it's the same cookie. Melodia watches for those three specific failures
+> and offers to switch the setting back off when it sees one.
+
+While it's on, the session is also written to `ytdlp_cookies.txt` in the app
+data folder, in the Netscape format yt-dlp reads (`0600` where the OS honours
+it). It's derived, never authoritative: rewritten from the saved session on
+demand, and deleted when the setting is turned off or you sign out.
+
+</details>
 
 <details>
 <summary><b>Fallback: use your own Google OAuth client</b></summary>
@@ -449,7 +524,8 @@ Worth knowing before you install:
 |---|---|
 | **No lossless streaming** | YouTube Music's best is ~256 kbps AAC. Its higher-bitrate Opus streams use a codec the player can't decode, so streams are always AAC. Lossless applies to local files only. |
 | **Music video mode doesn't work yet** | The stream resolves correctly but doesn't render in the app. Under investigation. |
-| **Installers are unsigned** | Windows SmartScreen will warn on first run. There's no auto-update channel. |
+| **Installers are unsigned** | Windows SmartScreen will warn on first run. Updates are notified in-app, not installed automatically. |
+| **Age-restricted songs need a setting** | Off by default because it lends yt-dlp your Google session, which YouTube may throttle or invalidate. See [Signing in](#signing-in). |
 | **Comments are read-only** | Posting would need a separate Google API and OAuth scopes. |
 | **Tracks buffer before playing** | Roughly 1.5s before audio starts, rather than true progressive streaming. Simpler and more robust; skipping stays responsive because fetching happens off the main thread. |
 | **Sign-in expires** | Cookie sessions last weeks. The OAuth fallback lasts longer. |
@@ -508,6 +584,7 @@ Melodia/
 │       ├── commands.rs     Commands exposed to the frontend
 │       ├── sidecar.rs      Spawns and talks to the Python helper
 │       ├── python.rs       Detects Python and installs the helper's packages
+│       ├── update.rs       Looks up the latest GitHub release
 │       ├── playback.rs     Audio thread: fetch, decode, play, fades, devices
 │       ├── equalizer.rs    5-band graphic EQ
 │       ├── analyzer.rs     FFT tap feeding the visualizer
@@ -536,6 +613,19 @@ The UI is built from shared primitives so pages can't drift apart.
 the theme store rewrites them per track from album-art colours. The app theme
 overwrites the same tokens at runtime, which is how re-skinning works without
 touching components.
+
+**The ambient wash** is one rule shared by `.app-backdrop` (the content panel)
+and `.chrome-wash` (the sidebar, when **Theme → Include the sidebar** is on),
+scaled by `--gradient-strength` and by a per-surface `--wash-scale`. It is
+deliberately *not* factored into a custom property on `:root`: a `var()` nested
+inside a custom property is substituted where that property is declared, so a
+`--wash-scale` set further down the tree would be ignored.
+
+**The album-art wallpaper** (`Wallpaper.tsx`, off by default) sits at a negative
+z-index inside the shell's `isolate` stacking context, so it paints above the
+shell's own background and below every panel. Turning it on also switches the
+content panel to `.app-backdrop--sheer` and the sidebar to `bg-black/70` — the
+wallpaper is only visible because the surfaces above it stop being opaque.
 
 **Reuse these rather than re-styling:**
 

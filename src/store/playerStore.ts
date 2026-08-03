@@ -4,6 +4,7 @@ import { listen } from "@tauri-apps/api/event";
 import type { Track } from "../lib/mockData";
 import type { RemoteCommand, RemoteState } from "../lib/types";
 import { useAudioSettingsStore, type StreamFormat } from "./audioSettingsStore";
+import { useStreamAuthStore } from "./streamAuthStore";
 
 export type RepeatMode = "off" | "all" | "one";
 
@@ -70,7 +71,13 @@ function playReal(track: Track, onError: (message: string) => void) {
     const { streamQuality } = useAudioSettingsStore.getState();
     invoke<StreamFormat>("playback_play", { videoId: track.id, quality: streamQuality })
       .then((format) => usePlayerStore.setState({ streamFormat: format }))
-      .catch((e) => onError(String(e)));
+      .catch((e) => {
+        const message = String(e);
+        // YouTube pushing back on the borrowed session is worth surfacing as
+        // its own thing: the fix is a setting, not a retry.
+        useStreamAuthStore.getState().reportFailure(message);
+        onError(message);
+      });
   }
 }
 

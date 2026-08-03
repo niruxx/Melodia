@@ -8,6 +8,8 @@ import { useLibraryStore } from "../store/libraryStore";
 import { useSourceStore, type MusicSource } from "../store/sourceStore";
 import { useLocalLibraryStore } from "../store/localLibraryStore";
 import { usePlaylistModalStore } from "../store/playlistModalStore";
+import { useUiThemeStore } from "../store/uiThemeStore";
+import { useWallpaperStore } from "../store/wallpaperStore";
 import { CoverArt } from "./CoverArt";
 import { AppIcon } from "./AppIcon";
 
@@ -40,6 +42,8 @@ export function Sidebar() {
   const setActiveSource = useSourceStore((s) => s.setActive);
   const localAlbums = useLocalLibraryStore((s) => s.albums);
   const openCreatePlaylist = usePlaylistModalStore((s) => s.openCreate);
+  const washSidebar = useUiThemeStore((s) => s.washSidebar);
+  const wallpaper = useWallpaperStore((s) => s.enabled);
 
   const isLocal = activeSource === "local";
   const allCollections = isLocal ? localAlbums : isSignedIn ? [...playlists, ...albums] : [];
@@ -51,7 +55,18 @@ export function Sidebar() {
   }
 
   return (
-    <aside className="chrome-panel flex h-full min-h-0 w-72 shrink-0 flex-col gap-2 bg-black px-2 py-2">
+    <aside
+      className={clsx(
+        "flex h-full min-h-0 w-72 shrink-0 flex-col gap-2 px-2 py-2",
+        // Both only paint `background-image`, so this swaps the sidebar's
+        // default lift for the content panel's album-art wash without
+        // disturbing its own base colour.
+        washSidebar ? "chrome-wash" : "chrome-panel",
+        // Opaque normally; sheer enough to show the artwork wallpaper behind
+        // it when that's on, so the window reads as one surface.
+        wallpaper ? "bg-black/70" : "bg-black",
+      )}
+    >
       <div className="flex items-center gap-2 px-3 py-2">
         <AppIcon className="h-7 w-7 rounded-md" />
         <span className="text-lg font-bold tracking-tight">Melodia</span>

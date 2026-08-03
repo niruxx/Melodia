@@ -3,6 +3,7 @@ import { create } from "zustand";
 const THEME_KEY = "melodia:ui-theme";
 const ACCENT_KEY = "melodia:ui-accent";
 const GRADIENT_KEY = "melodia:ui-gradient";
+const WASH_SIDEBAR_KEY = "melodia:ui-wash-sidebar";
 
 /**
  * Mirrors the `@theme` tokens declared in `src/index.css`. Tailwind v4 compiles
@@ -206,12 +207,17 @@ type UiThemeStore = {
   /** Overrides the preset's accent pair when set. */
   accent: AccentPair | null;
   gradient: GradientIntensity;
+  /** Whether the wash reaches the library sidebar as well as the content
+   *  panel. Off by default: the sidebar's flat black is the shape most of the
+   *  presets were drawn around. */
+  washSidebar: boolean;
 
   init: () => void;
   setTheme: (id: string) => void;
   setAccent: (index: 0 | 1, color: string) => void;
   resetAccent: () => void;
   setGradient: (intensity: GradientIntensity) => void;
+  setWashSidebar: (value: boolean) => void;
   colors: () => ThemeColors;
 };
 
@@ -219,6 +225,7 @@ export const useUiThemeStore = create<UiThemeStore>((set, get) => ({
   themeId: DEFAULT_THEME_ID,
   accent: null,
   gradient: "subtle",
+  washSidebar: false,
 
   init: () => {
     const storedId = localStorage.getItem(THEME_KEY);
@@ -242,7 +249,12 @@ export const useUiThemeStore = create<UiThemeStore>((set, get) => ({
       }
     }
 
-    set({ themeId, accent, gradient });
+    set({
+      themeId,
+      accent,
+      gradient,
+      washSidebar: localStorage.getItem(WASH_SIDEBAR_KEY) === "true",
+    });
     applyColors(resolveColors(themeId, accent));
     applyGradient(themeId, gradient);
   },
@@ -262,6 +274,13 @@ export const useUiThemeStore = create<UiThemeStore>((set, get) => ({
     localStorage.setItem(GRADIENT_KEY, intensity);
     set({ gradient: intensity });
     applyGradient(get().themeId, intensity);
+  },
+
+  // Nothing to apply to the document: the sidebar reads this directly, and the
+  // wash it switches on is the same one the content panel is already showing.
+  setWashSidebar: (value) => {
+    localStorage.setItem(WASH_SIDEBAR_KEY, String(value));
+    set({ washSidebar: value });
   },
 
   setAccent: (index, color) => {

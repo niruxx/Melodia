@@ -12,6 +12,7 @@ import {
   useVisualizerStore,
   type VisualizerTheme,
 } from "../store/visualizerStore";
+import { useWallpaperStore } from "../store/wallpaperStore";
 
 /** Mirrors the canvas gradient, which runs bottom-to-top. */
 function swatchGradient(theme: VisualizerTheme): string {
@@ -47,6 +48,10 @@ export function ThemeSettings() {
   const colors = useUiThemeStore((s) => s.colors());
   const gradient = useUiThemeStore((s) => s.gradient);
   const setGradient = useUiThemeStore((s) => s.setGradient);
+  const washSidebar = useUiThemeStore((s) => s.washSidebar);
+  const setWashSidebar = useUiThemeStore((s) => s.setWashSidebar);
+  const wallpaper = useWallpaperStore((s) => s.enabled);
+  const setWallpaper = useWallpaperStore((s) => s.setEnabled);
 
   const visualizerThemeId = useVisualizerStore((s) => s.themeId);
   const visualizerCustom = useVisualizerStore((s) => s.custom);
@@ -140,6 +145,46 @@ export function ThemeSettings() {
             </button>
           ))}
         </div>
+
+        {/* Off leaves nothing to extend, so the choice is held but not
+            offered — flipping it there would appear to do nothing. */}
+        <label
+          className={clsx(
+            "flex items-center justify-between gap-3 rounded-lg bg-surface-3/50 px-3 py-2",
+            gradient === "off" ? "cursor-not-allowed opacity-50" : "cursor-pointer",
+          )}
+        >
+          <span className="min-w-0">
+            <span className="block text-xs font-semibold text-fg">Include the sidebar</span>
+            <span className="block text-[11px] text-muted">
+              Carries the wash across the library panel on the left instead of leaving it flat.
+            </span>
+          </span>
+          <input
+            type="checkbox"
+            checked={washSidebar}
+            disabled={gradient === "off"}
+            onChange={(e) => setWashSidebar(e.target.checked)}
+            className="h-4 w-4 shrink-0 accent-[var(--color-accent)]"
+          />
+        </label>
+      </div>
+
+      <div className="flex flex-col gap-2">
+        <div className="text-sm font-semibold">Album-art wallpaper</div>
+        <div className="text-xs text-muted">
+          Fills the window behind the app with artwork from your library, blurred right back and
+          changing every minute. The panels go slightly sheer so it shows through.
+        </div>
+        <label className="flex cursor-pointer items-center justify-between gap-3 rounded-lg bg-surface-3/50 px-3 py-2">
+          <span className="text-xs font-semibold text-fg">Use album art as the background</span>
+          <input
+            type="checkbox"
+            checked={wallpaper}
+            onChange={(e) => setWallpaper(e.target.checked)}
+            className="h-4 w-4 shrink-0 accent-[var(--color-accent)]"
+          />
+        </label>
       </div>
 
       <div className="flex flex-col gap-2">

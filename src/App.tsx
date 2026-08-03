@@ -1,6 +1,7 @@
 import { useEffect, useRef } from "react";
 import { HashRouter, Route, Routes, useLocation } from "react-router-dom";
 import { AnimatePresence } from "framer-motion";
+import clsx from "clsx";
 import { TitleBar } from "./components/TitleBar";
 import { ResizeHandles } from "./components/ResizeHandles";
 import { Sidebar } from "./components/Sidebar";
@@ -13,6 +14,10 @@ import { SignInModal } from "./components/SignInModal";
 import { SettingsModal } from "./components/SettingsModal";
 import { DeviceConnectModal } from "./components/DeviceConnectModal";
 import { SetupWizard } from "./components/SetupWizard";
+import { UpdateBanner, UpdateNotes } from "./components/UpdateBanner";
+import { StreamAuthWarning } from "./components/StreamAuthWarning";
+import { Wallpaper } from "./components/Wallpaper";
+import { useWallpaperStore } from "./store/wallpaperStore";
 import { PlaylistFormModal } from "./components/PlaylistFormModal";
 import { AddToPlaylistModal } from "./components/AddToPlaylistModal";
 import { IncomingControlRequestModal } from "./components/IncomingControlRequestModal";
@@ -43,6 +48,8 @@ import { useThemeStore } from "./store/themeStore";
 import { useVisualizerStore } from "./store/visualizerStore";
 import { useSetupStore } from "./store/setupStore";
 import { usePythonStore } from "./store/pythonStore";
+import { useUpdateStore } from "./store/updateStore";
+import { useStreamAuthStore } from "./store/streamAuthStore";
 import { useVideoStore } from "./store/videoStore";
 import { useUiThemeStore } from "./store/uiThemeStore";
 import { migrateLegacyStorage } from "./lib/storageMigration";
@@ -82,6 +89,7 @@ function App() {
   const currentTrack = usePlayerStore((s) => s.currentTrack());
   const isPlaying = usePlayerStore((s) => s.isPlaying);
   const isMini = useMiniPlayerStore((s) => s.active);
+  const wallpaper = useWallpaperStore((s) => s.enabled);
   /** One Python probe per session, at most. */
   const pythonChecked = useRef(false);
 
@@ -93,6 +101,7 @@ function App() {
   useEffect(() => {
     migrateLegacyStorage();
     useUiThemeStore.getState().init();
+    useWallpaperStore.getState().init();
   }, []);
 
   useEffect(() => {
@@ -105,6 +114,16 @@ function App() {
     useVisualizerStore.getState().init();
     useSetupStore.getState().init();
     useVideoStore.getState().init();
+    // Once per launch, and only if the user hasn't turned it off.
+    useUpdateStore.getState().init();
+  }, []);
+
+  // An upgrade can change what the helper needs, and an import that still
+  // succeeds says nothing about whether the *versions* in requirements.txt are
+  // satisfied. Letting pip settle that is the only reliable answer, so it runs
+  // on the first launch after the version changes — visibly, in the setup step.
+  useEffect(() => {
+    void usePythonStore.getState().verifyAfterUpgrade();
   }, []);
 
   // A machine whose Python helper can't run gets the setup step that fixes it,
@@ -126,6 +145,9 @@ function App() {
   }, [authState]);
 
   useEffect(() => {
+    // Re-read rather than init once: whether yt-dlp *can* borrow the session
+    // depends on there being a cookie sign-in, which this is the change to.
+    void useStreamAuthStore.getState().init();
     if (authState === "signed_in") {
       useLibraryStore.getState().fetchAll();
       useAccountStore.getState().fetch();
@@ -165,13 +187,23 @@ function App() {
 
   return (
     <HashRouter>
-      <div className="relative flex h-screen w-screen flex-col overflow-hidden bg-black text-fg">
+      {/* `isolate` keeps the wallpaper's negative z-index inside this shell:
+          it then paints above the shell's own background but below everything
+          in it, which is exactly where a wallpaper belongs. */}
+      <div className="relative isolate flex h-screen w-screen flex-col overflow-hidden bg-black text-fg">
+        <Wallpaper />
         <ResizeHandles />
         <TitleBar />
         <div className="flex min-h-0 flex-1 gap-2 p-2 pb-0">
           <Sidebar />
-          <div className="app-backdrop flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden rounded-lg border border-border/60">
+          <div
+            className={clsx(
+              "app-backdrop flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden rounded-lg border border-border/60",
+              wallpaper && "app-backdrop--sheer",
+            )}
+          >
             <TopBar />
+            <UpdateBanner />
             {/* `relative` lifts the routed content above the backdrop's
                 ::before scrim, which would otherwise sit over it. */}
             <main className="relative min-h-0 flex-1 overflow-y-auto">
@@ -194,6 +226,8 @@ function App() {
       <CommandPalette />
       <ShortcutsOverlay />
       <SetupWizard />
+      <UpdateNotes />
+      <StreamAuthWarning />
       <Toaster />
       <GlobalShortcuts />
     </HashRouter>

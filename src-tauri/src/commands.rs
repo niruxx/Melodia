@@ -50,6 +50,23 @@ pub async fn ytm_sign_out(sidecar: State<'_, Sidecar>) -> Result<Value, String> 
     sidecar.call("sign_out", serde_json::json!({})).await
 }
 
+/// Whether yt-dlp is allowed to reuse the signed-in session, and whether there
+/// is one to reuse.
+#[tauri::command]
+pub async fn ytm_get_stream_auth(sidecar: State<'_, Sidecar>) -> Result<Value, String> {
+    sidecar.call("get_stream_auth", serde_json::json!({})).await
+}
+
+#[tauri::command]
+pub async fn ytm_set_stream_auth(
+    sidecar: State<'_, Sidecar>,
+    enabled: bool,
+) -> Result<Value, String> {
+    sidecar
+        .call("set_stream_auth", serde_json::json!({ "enabled": enabled }))
+        .await
+}
+
 #[tauri::command]
 pub async fn ytm_get_home(sidecar: State<'_, Sidecar>) -> Result<Value, String> {
     sidecar.call("get_home", serde_json::json!({})).await

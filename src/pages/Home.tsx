@@ -9,18 +9,8 @@ import { useSourceStore } from "../store/sourceStore";
 import { useLibraryStore } from "../store/libraryStore";
 import { useAccountStore } from "../store/accountStore";
 import { usePlayCollection } from "../hooks/usePlayCollection";
-import type { Collection, Track } from "../lib/types";
-
-function trackAsCollection(track: Track): Collection {
-  return {
-    id: `song-${track.id}`,
-    title: track.title,
-    subtitle: track.artist,
-    kind: "playlist",
-    trackIds: [track.id],
-    thumbnail: track.thumbnail,
-  };
-}
+import { Suggested } from "../components/Suggested";
+import { trackAsCollection } from "../lib/collections";
 
 /** Shown while the account name loads, or if it can't be fetched. */
 function greeting(): string {
@@ -79,6 +69,8 @@ export function Home() {
           )}
         </div>
       </div>
+
+      <Suggested />
 
       {home.loading && (
         <>

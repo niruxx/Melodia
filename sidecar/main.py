@@ -90,6 +90,13 @@ except Exception as e:
 CONFIG_PATH = DATA_DIR / "ytmusic_config.json"
 TOKEN_PATH = DATA_DIR / "ytmusic_oauth.json"
 BROWSER_AUTH_PATH = DATA_DIR / "ytmusic_browser.json"
+# Whether yt-dlp may sign in as the user. Kept here rather than in the app's
+# settings so a restarted helper doesn't silently forget it mid-session.
+STREAM_AUTH_PATH = DATA_DIR / "ytdlp_auth.json"
+# Netscape cookie jar, rewritten from the saved session each time it's needed.
+# Never the source of truth — it's derived, and deleted the moment it isn't
+# wanted, because it holds a complete Google session in plain text.
+COOKIE_JAR_PATH = DATA_DIR / "ytdlp_cookies.txt"
 
 state = {"yt": None, "credentials": None, "oauth_pending": None, "browser_checked": False}
 
@@ -137,6 +144,122 @@ def try_load_browser_client():
         # force a full re-login on the next launch.
         state["yt"] = None
     return state["yt"]
+
+
+# ---- yt-dlp authentication ------------------------------------------------
+#
+# ytmusicapi and yt-dlp are separate clients with separate auth. Signing in
+# only ever gave ytmusicapi the session, so yt-dlp resolved every stream as an
+# anonymous visitor — which cannot see age-restricted videos at all, whatever
+# the account's age. Lending it the same cookies fixes that.
+#
+# It is off by default and worth leaving off unless something needs it: YouTube
+# treats account cookies used outside a browser as a bot signal, and the
+# consequences (throttling, "confirm you're not a bot" on ordinary tracks, or
+# the session being invalidated — which signs the *library* out too, since it's
+# the same cookie) land on the user's real Google account.
+
+# The jar has to carry an expiry or http.cookiejar treats each entry as a
+# session cookie and drops it. The captured session's real expiry isn't
+# knowable from a Cookie header, so this is a stand-in; YouTube rejecting a
+# genuinely expired cookie is the same failure either way.
+COOKIE_EXPIRY = 2147483647  # 2038, the largest value every parser accepts
+
+
+def stream_auth_enabled() -> bool:
+    try:
+        return bool(json.loads(STREAM_AUTH_PATH.read_text(encoding="utf-8")).get("enabled"))
+    except Exception:
+        # Missing or corrupt reads as off, which is the safe direction.
+        return False
+
+
+def saved_cookie_header() -> str:
+    """The raw `name=value; …` string from the saved browser session."""
+    try:
+        headers = json.loads(BROWSER_AUTH_PATH.read_text(encoding="utf-8"))
+        return headers.get("cookie") or ""
+    except Exception:
+        return ""
+
+
+def discard_cookie_jar():
+    try:
+        COOKIE_JAR_PATH.unlink()
+    except FileNotFoundError:
+        pass
+    except Exception:
+        pass
+
+
+def write_cookie_jar() -> bool:
+    """Rebuilds the jar from the saved session. False if there's nothing to write.
+
+    Rewritten rather than cached because yt-dlp updates the file in place as
+    YouTube rotates cookies, and the session on disk is the authority.
+    """
+    cookie = saved_cookie_header()
+    if not cookie:
+        discard_cookie_jar()
+        return False
+
+    lines = ["# Netscape HTTP Cookie File", "# Written by Melodia. Do not edit."]
+    for pair in cookie.split(";"):
+        name, _, value = pair.strip().partition("=")
+        if not name or not value:
+            continue
+        # `.youtube.com` covers www and music alike. The session was captured
+        # from music.youtube.com, so that is the domain these belong to even
+        # for the ones Google also sets on google.com.
+        lines.append(
+            "\t".join((".youtube.com", "TRUE", "/", "TRUE", str(COOKIE_EXPIRY), name, value))
+        )
+
+    if len(lines) == 2:
+        discard_cookie_jar()
+        return False
+
+    try:
+        COOKIE_JAR_PATH.write_text("\n".join(lines) + "\n", encoding="utf-8")
+        # Best effort, and a no-op on Windows: this file is a complete Google
+        # session, so it should not be world-readable where that means anything.
+        try:
+            COOKIE_JAR_PATH.chmod(0o600)
+        except Exception:
+            pass
+        return True
+    except Exception:
+        return False
+
+
+def ydl_auth_opts() -> dict:
+    """yt-dlp options that sign it in, or nothing at all when it shouldn't be."""
+    if not stream_auth_enabled():
+        # Not left lying around while switched off.
+        discard_cookie_jar()
+        return {}
+    if not write_cookie_jar():
+        return {}
+    return {"cookiefile": str(COOKIE_JAR_PATH)}
+
+
+def cmd_get_stream_auth(_args):
+    return {
+        "enabled": stream_auth_enabled(),
+        # Nothing to lend yt-dlp without a cookie session — the OAuth sign-in
+        # produces a token ytmusicapi uses, not browser cookies.
+        "available": bool(saved_cookie_header()),
+    }
+
+
+def cmd_set_stream_auth(args):
+    enabled = bool(args.get("enabled"))
+    STREAM_AUTH_PATH.write_text(json.dumps({"enabled": enabled}), encoding="utf-8")
+    if enabled:
+        write_cookie_jar()
+    else:
+        discard_cookie_jar()
+    return cmd_get_stream_auth(None)
 
 
 def load_config():
@@ -307,8 +430,10 @@ def cmd_sign_out(_args):
     state["oauth_pending"] = None
     state["browser_checked"] = False
     # Clear both auth methods so signing out doesn't silently fall back to a
-    # stale session from the other one.
-    for path in (TOKEN_PATH, BROWSER_AUTH_PATH):
+    # stale session from the other one. The cookie jar is derived from the
+    # browser session, so signing out has to take it with them — leaving a
+    # copy of the session behind after "sign out" would be indefensible.
+    for path in (TOKEN_PATH, BROWSER_AUTH_PATH, COOKIE_JAR_PATH):
         if path.exists():
             path.unlink()
     return {"ok": True}
@@ -599,6 +724,8 @@ def cmd_get_video_url(args):
         "noplaylist": True,
         "socket_timeout": REQUEST_TIMEOUT_SECONDS,
         "format": selector,
+        # Without this the video layer age-gates on tracks whose audio played.
+        **ydl_auth_opts(),
     }
     with yt_dlp.YoutubeDL(ydl_opts) as ydl:
         info = ydl.extract_info(f"https://www.youtube.com/watch?v={video_id}", download=False)
@@ -656,6 +783,9 @@ def cmd_get_comments(args):
                 "comment_sort": [sort],
             }
         },
+        # Comments on an age-restricted video are invisible to a signed-out
+        # client, which reads as "this video has no comments".
+        **ydl_auth_opts(),
     }
     with yt_dlp.YoutubeDL(ydl_opts) as ydl:
         info = ydl.extract_info(f"https://www.youtube.com/watch?v={video_id}", download=False)
@@ -707,6 +837,8 @@ def cmd_get_stream_url(args):
         # Same reasoning as REQUEST_TIMEOUT_SECONDS: resolving a stream sits on
         # the one command loop, so it must not be able to block indefinitely.
         "socket_timeout": REQUEST_TIMEOUT_SECONDS,
+        # Age-restricted tracks are unresolvable without this.
+        **ydl_auth_opts(),
     }
     with yt_dlp.YoutubeDL(ydl_opts) as ydl:
         info = ydl.extract_info(f"https://music.youtube.com/watch?v={video_id}", download=False)
@@ -760,6 +892,8 @@ COMMANDS = {
     "get_comments": cmd_get_comments,
     "get_video_url": cmd_get_video_url,
     "get_stream_url": cmd_get_stream_url,
+    "get_stream_auth": cmd_get_stream_auth,
+    "set_stream_auth": cmd_set_stream_auth,
 }
 
 

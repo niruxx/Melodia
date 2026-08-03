@@ -27,7 +27,12 @@
   },
   "bundle": {
     "active": true,
-    "targets": "all",
+    "targets": ["msi", "app", "dmg", "appimage", "deb", "rpm"],
+    "windows": {
+      "wix": {
+        "upgradeCode": "5605eda2-faf0-53ae-81c1-07cff09537a4"
+      }
+    },
     "icon": [
       "icons/32x32.png",
       "icons/128x128.png",

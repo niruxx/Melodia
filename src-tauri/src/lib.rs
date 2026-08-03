@@ -10,6 +10,7 @@ mod network;
 mod playback;
 mod python;
 mod sidecar;
+mod update;
 
 use background::BackgroundMode;
 use discord::Discord;
@@ -104,6 +105,8 @@ pub fn run() {
             commands::ytm_start_oauth,
             commands::ytm_poll_oauth,
             commands::ytm_sign_out,
+            commands::ytm_get_stream_auth,
+            commands::ytm_set_stream_auth,
             commands::ytm_get_home,
             commands::ytm_get_library_playlists,
             commands::ytm_get_library_albums,
@@ -124,6 +127,7 @@ pub fn run() {
             python::python_status,
             python::python_open_installer,
             python::python_install_packages,
+            update::check_for_update,
             commands::discord_connect,
             commands::discord_update_presence,
             commands::discord_disconnect,
