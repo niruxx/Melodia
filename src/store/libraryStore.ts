@@ -54,8 +54,12 @@ type LibraryStore = {
   history: Section<Track[]>;
   trackCache: Record<string, Track>;
   playlistCache: Record<string, PlaylistDetail>;
+  /** The playlist just created, so the sidebar can show it arriving. Cleared
+   *  once that has played — it marks an event, not a state. */
+  arrivedId: string | null;
 
   fetchAll: () => void;
+  clearArrived: () => void;
   refreshPlaylists: () => Promise<void>;
   getPlaylistDetail: (id: string, opts?: { force?: boolean }) => Promise<PlaylistDetail | null>;
   getPlaylistTracks: (id: string) => Promise<Track[]>;
@@ -78,6 +82,9 @@ export const useLibraryStore = create<LibraryStore>((set, get) => ({
   history: emptySection(),
   trackCache: {},
   playlistCache: {},
+  arrivedId: null,
+
+  clearArrived: () => set({ arrivedId: null }),
 
   fetchAll: () => {
     set({
@@ -195,6 +202,9 @@ export const useLibraryStore = create<LibraryStore>((set, get) => ({
 
   createPlaylist: async (title, description = "", privacy = "PRIVATE") => {
     const id = await ytmusic.createPlaylist(title, description, privacy);
+    // Marked before the refresh so the sidebar sees it on the same render the
+    // playlist first appears on, rather than a frame later.
+    set({ arrivedId: id });
     await get().refreshPlaylists();
     return id;
   },
@@ -297,5 +307,6 @@ export const useLibraryStore = create<LibraryStore>((set, get) => ({
       history: emptySection(),
       trackCache: {},
       playlistCache: {},
+      arrivedId: null,
     }),
 }));

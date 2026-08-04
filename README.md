@@ -819,6 +819,8 @@ wallpaper is only visible because the surfaces above it stop being opaque.
 |---|---|
 | `PlayControls` | The play + shuffle pair atop collection pages |
 | `TrackList` / `TrackRow` | Any list of songs |
+| `LikeButton` | Every heart — carries the like/unlike animation |
+| `ShuffleButton` | Every shuffle control, toggle or action |
 | `Skeleton` | Loading placeholders — never a bare spinner |
 | `Marquee` | Titles that may overflow |
 | `PlayingBars` | The "this is playing" indicator |
@@ -831,8 +833,17 @@ wallpaper is only visible because the surfaces above it stop being opaque.
 - Detail pages share one hero: large artwork tile, uppercase eyebrow, `text-3xl sm:text-4xl` title, count line
 - Cards are `rounded-lg`, and their skeletons must match or content shifts on load
 - Interactions use Framer Motion `whileHover`/`whileTap`, not CSS `hover:scale-*`
+- **Feedback animations carry direction.** Liking springs open and throws a ring;
+  unliking just squeezes. Shuffle spins a full turn going on and settles going
+  off. The shape of the motion says which way the state went, so it reads
+  without waiting for the colour to register
+- **Nothing animates on mount.** A press counter gates every one of these, or a
+  list of already-liked songs would pop every heart on screen each render
 - Overlay stacking: drawer `40` → modals `50` → incoming request `60` → shortcuts `65` → palette `68` → context menu / release notes `70` → stream-auth warning `72`
-- Every animation is covered by the global `prefers-reduced-motion` guard
+- Every animation is covered by `prefers-reduced-motion`, from both ends: the
+  `@media` block in `index.css` for CSS animations, and `<MotionConfig
+  reducedMotion="user">` in `main.tsx` for Framer's, which run in JavaScript
+  and would otherwise sail past the CSS entirely
 
 </details>
 

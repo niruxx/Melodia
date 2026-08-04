@@ -4,6 +4,7 @@ const THEME_KEY = "melodia:ui-theme";
 const ACCENT_KEY = "melodia:ui-accent";
 const GRADIENT_KEY = "melodia:ui-gradient";
 const WASH_SIDEBAR_KEY = "melodia:ui-wash-sidebar";
+const WASH_TITLEBAR_KEY = "melodia:ui-wash-titlebar";
 
 /**
  * Mirrors the `@theme` tokens declared in `src/index.css`. Tailwind v4 compiles
@@ -211,6 +212,10 @@ type UiThemeStore = {
    *  panel. Off by default: the sidebar's flat black is the shape most of the
    *  presets were drawn around. */
   washSidebar: boolean;
+  /** Same, for the window's own title bar. Separate from the sidebar because
+   *  it's the one piece of chrome that reads as part of the OS, so tinting it
+   *  is a stronger statement than tinting a panel inside the app. */
+  washTitlebar: boolean;
 
   init: () => void;
   setTheme: (id: string) => void;
@@ -218,6 +223,7 @@ type UiThemeStore = {
   resetAccent: () => void;
   setGradient: (intensity: GradientIntensity) => void;
   setWashSidebar: (value: boolean) => void;
+  setWashTitlebar: (value: boolean) => void;
   colors: () => ThemeColors;
 };
 
@@ -226,6 +232,7 @@ export const useUiThemeStore = create<UiThemeStore>((set, get) => ({
   accent: null,
   gradient: "subtle",
   washSidebar: false,
+  washTitlebar: false,
 
   init: () => {
     const storedId = localStorage.getItem(THEME_KEY);
@@ -254,6 +261,7 @@ export const useUiThemeStore = create<UiThemeStore>((set, get) => ({
       accent,
       gradient,
       washSidebar: localStorage.getItem(WASH_SIDEBAR_KEY) === "true",
+      washTitlebar: localStorage.getItem(WASH_TITLEBAR_KEY) === "true",
     });
     applyColors(resolveColors(themeId, accent));
     applyGradient(themeId, gradient);
@@ -281,6 +289,11 @@ export const useUiThemeStore = create<UiThemeStore>((set, get) => ({
   setWashSidebar: (value) => {
     localStorage.setItem(WASH_SIDEBAR_KEY, String(value));
     set({ washSidebar: value });
+  },
+
+  setWashTitlebar: (value) => {
+    localStorage.setItem(WASH_TITLEBAR_KEY, String(value));
+    set({ washTitlebar: value });
   },
 
   setAccent: (index, color) => {

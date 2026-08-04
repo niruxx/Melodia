@@ -1,5 +1,6 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { NavLink, useNavigate } from "react-router-dom";
+import { motion } from "framer-motion";
 import { Home, Search, Library, Heart, Plus } from "lucide-react";
 import clsx from "clsx";
 import { usePlayerStore } from "../store/playerStore";
@@ -44,6 +45,17 @@ export function Sidebar() {
   const openCreatePlaylist = usePlaylistModalStore((s) => s.openCreate);
   const washSidebar = useUiThemeStore((s) => s.washSidebar);
   const wallpaper = useWallpaperStore((s) => s.enabled);
+  const arrivedId = useLibraryStore((s) => s.arrivedId);
+  const clearArrived = useLibraryStore((s) => s.clearArrived);
+
+  // Cleared once the animation has run, so re-rendering the list later (a
+  // filter change, a refetch) doesn't replay it on a playlist that is no
+  // longer new.
+  useEffect(() => {
+    if (!arrivedId) return;
+    const id = setTimeout(clearArrived, 1600);
+    return () => clearTimeout(id);
+  }, [arrivedId, clearArrived]);
 
   const isLocal = activeSource === "local";
   const allCollections = isLocal ? localAlbums : isSignedIn ? [...playlists, ...albums] : [];
@@ -115,14 +127,17 @@ export function Sidebar() {
           {/* Creating playlists goes through the signed-in YouTube account, so
               it's hidden for local playback and while signed out. */}
           {!isLocal && isSignedIn && (
-            <button
+            <motion.button
+              whileHover={{ scale: 1.12 }}
+              whileTap={{ scale: 0.88 }}
+              transition={{ type: "spring", stiffness: 500, damping: 22 }}
               onClick={() => openCreatePlaylist()}
               className="ml-auto rounded-full p-1 text-muted transition-colors hover:bg-surface-2 hover:text-fg"
               title="Create playlist"
               aria-label="Create playlist"
             >
               <Plus size={18} />
-            </button>
+            </motion.button>
           )}
         </div>
 
@@ -181,6 +196,8 @@ export function Sidebar() {
                   clsx(
                     "flex items-center gap-3 rounded-md px-2 py-2 text-sm transition-colors",
                     isActive ? "bg-surface-2" : "hover:bg-surface-2",
+                    // Only the playlist that was just created, and only once.
+                    c.id === arrivedId && "arrive",
                   )
                 }
               >

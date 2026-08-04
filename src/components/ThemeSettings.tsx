@@ -14,6 +14,12 @@ import {
 } from "../store/visualizerStore";
 import { useWallpaperStore } from "../store/wallpaperStore";
 
+/** Surfaces outside the content panel that can opt into the ambient wash. */
+const WASH_SURFACES = [
+  { id: "sidebar", label: "The library sidebar" },
+  { id: "titlebar", label: "The title bar" },
+] as const;
+
 /** Mirrors the canvas gradient, which runs bottom-to-top. */
 function swatchGradient(theme: VisualizerTheme): string {
   return theme.colors
@@ -50,6 +56,8 @@ export function ThemeSettings() {
   const setGradient = useUiThemeStore((s) => s.setGradient);
   const washSidebar = useUiThemeStore((s) => s.washSidebar);
   const setWashSidebar = useUiThemeStore((s) => s.setWashSidebar);
+  const washTitlebar = useUiThemeStore((s) => s.washTitlebar);
+  const setWashTitlebar = useUiThemeStore((s) => s.setWashTitlebar);
   const wallpaper = useWallpaperStore((s) => s.enabled);
   const setWallpaper = useWallpaperStore((s) => s.setEnabled);
 
@@ -146,28 +154,38 @@ export function ThemeSettings() {
           ))}
         </div>
 
-        {/* Off leaves nothing to extend, so the choice is held but not
-            offered — flipping it there would appear to do nothing. */}
-        <label
+        {/* Off leaves nothing to extend, so the choices are held but not
+            offered — flipping one there would appear to do nothing. */}
+        <div
           className={clsx(
-            "flex items-center justify-between gap-3 rounded-lg bg-surface-3/50 px-3 py-2",
-            gradient === "off" ? "cursor-not-allowed opacity-50" : "cursor-pointer",
+            "flex flex-col gap-1 rounded-lg bg-surface-3/50 px-3 py-2",
+            gradient === "off" && "opacity-50",
           )}
         >
-          <span className="min-w-0">
-            <span className="block text-xs font-semibold text-fg">Include the sidebar</span>
-            <span className="block text-[11px] text-muted">
-              Carries the wash across the library panel on the left instead of leaving it flat.
-            </span>
-          </span>
-          <input
-            type="checkbox"
-            checked={washSidebar}
-            disabled={gradient === "off"}
-            onChange={(e) => setWashSidebar(e.target.checked)}
-            className="h-4 w-4 shrink-0 accent-[var(--color-accent)]"
-          />
-        </label>
+          <span className="text-[11px] text-muted">Also carry it across:</span>
+          {WASH_SURFACES.map((surface) => (
+            <label
+              key={surface.id}
+              className={clsx(
+                "flex items-center justify-between gap-3 py-0.5",
+                gradient === "off" ? "cursor-not-allowed" : "cursor-pointer",
+              )}
+            >
+              <span className="text-xs font-semibold text-fg">{surface.label}</span>
+              <input
+                type="checkbox"
+                checked={surface.id === "sidebar" ? washSidebar : washTitlebar}
+                disabled={gradient === "off"}
+                onChange={(e) =>
+                  surface.id === "sidebar"
+                    ? setWashSidebar(e.target.checked)
+                    : setWashTitlebar(e.target.checked)
+                }
+                className="h-4 w-4 shrink-0 accent-[var(--color-accent)]"
+              />
+            </label>
+          ))}
+        </div>
       </div>
 
       <div className="flex flex-col gap-2">

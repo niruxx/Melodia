@@ -1,5 +1,6 @@
 import { motion } from "framer-motion";
-import { Play, Shuffle } from "lucide-react";
+import { Play } from "lucide-react";
+import { ShuffleButton } from "./ShuffleButton";
 
 type PlayControlsProps = {
   onPlay: () => void;
@@ -25,14 +26,12 @@ export function PlayControls({ onPlay, onShuffle }: PlayControlsProps) {
       >
         <Play size={20} fill="currentColor" className="ml-0.5" />
       </motion.button>
-      <motion.button
-        whileTap={{ scale: 0.9 }}
+      <ShuffleButton
         onClick={onShuffle}
+        size={18}
+        label="Shuffle play"
         className="flex h-10 w-10 items-center justify-center rounded-full bg-surface-2 text-muted transition-colors hover:bg-surface-3 hover:text-fg"
-        aria-label="Shuffle play"
-      >
-        <Shuffle size={18} />
-      </motion.button>
+      />
     </div>
   );
 }

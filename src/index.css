@@ -211,6 +211,19 @@ body {
   );
 }
 
+/* The title bar's opt-in tint: `.chrome-bar` mirrored, so the accent bleeds
+   down from the top of the window the way it bleeds up from the bottom.
+   Deliberately not `.chrome-wash` — those radial gradients are sized for tall
+   panels and collapse into a lopsided smudge across a 32px strip. A little
+   stronger than the player bar because there is less of it to notice. */
+.chrome-bar-top {
+  background-image: linear-gradient(
+    to bottom,
+    color-mix(in srgb, var(--accent-dynamic-1) calc(11% * var(--gradient-strength)), transparent),
+    transparent 85%
+  );
+}
+
 /* ---------------------------------------------------------------- *
  * Keyframes
  * ---------------------------------------------------------------- */
@@ -367,6 +380,33 @@ input[type="range"].tb-range:disabled {
 }
 input[type="range"].tb-range:disabled::-webkit-slider-thumb {
   opacity: 0;
+}
+
+/* A row sliding into a list it wasn't in a moment ago — currently the sidebar
+   entry for a playlist you just created. The accent tint decays to nothing, so
+   the row ends up styled exactly like its neighbours and needs no cleanup
+   beyond dropping the class.
+
+   Deliberately a CSS animation rather than a Framer one: the reduced-motion
+   block below then covers it for free. */
+@keyframes arrive {
+  from {
+    opacity: 0;
+    transform: translateY(-8px);
+    background-color: color-mix(in srgb, var(--color-accent) 32%, transparent);
+  }
+  55% {
+    opacity: 1;
+    transform: none;
+  }
+  to {
+    background-color: transparent;
+  }
+}
+
+.arrive {
+  animation: arrive 1.5s ease-out;
+  border-radius: 0.375rem;
 }
 
 /* ---------------------------------------------------------------- *

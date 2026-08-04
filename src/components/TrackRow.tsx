@@ -1,7 +1,8 @@
 import { Reorder, motion, useDragControls } from "framer-motion";
-import { GripVertical, Heart, Pause, Play, Share2 } from "lucide-react";
+import { GripVertical, Pause, Play, Share2 } from "lucide-react";
 import clsx from "clsx";
 import { CoverArt } from "./CoverArt";
+import { LikeButton } from "./LikeButton";
 import { PlayingBars } from "./PlayingBars";
 import { usePlayerStore } from "../store/playerStore";
 import { useTrackContextMenu } from "../hooks/useTrackContextMenu";
@@ -106,20 +107,15 @@ export function TrackRow({
       {showAlbum && <div className="hidden truncate text-sm text-muted sm:block">{track.album}</div>}
 
       <div className="flex items-center gap-3">
-        <motion.button
-          whileTap={{ scale: 0.85 }}
-          onClick={(e) => {
-            e.stopPropagation();
-            toggleLike(track.id);
-          }}
+        <LikeButton
+          liked={liked}
+          onToggle={() => toggleLike(track.id)}
+          stopPropagation
           className={clsx(
             "opacity-0 transition-opacity focus-visible:opacity-100 group-hover:opacity-100",
             liked && "text-accent opacity-100",
           )}
-          aria-label={liked ? "Remove from Liked Songs" : "Add to Liked Songs"}
-        >
-          <Heart size={16} fill={liked ? "currentColor" : "none"} />
-        </motion.button>
+        />
         {!isLocal && (
           <motion.button
             whileTap={{ scale: 0.85 }}

@@ -1,7 +1,6 @@
 import { motion } from "framer-motion";
 import {
   Cast,
-  Heart,
   ListMusic,
   Maximize2,
   MessageSquare,
@@ -11,7 +10,6 @@ import {
   Repeat,
   Repeat1,
   Share2,
-  Shuffle,
   SkipBack,
   SkipForward,
   Volume1,
@@ -22,6 +20,8 @@ import clsx from "clsx";
 import { CoverArt } from "./CoverArt";
 import { Marquee } from "./Marquee";
 import { SleepTimerChip } from "./SleepTimerChip";
+import { LikeButton } from "./LikeButton";
+import { ShuffleButton } from "./ShuffleButton";
 import { usePlayerStore } from "../store/playerStore";
 import { useNetworkStore } from "../store/networkStore";
 import { useMiniPlayerStore } from "../store/miniPlayerStore";
@@ -106,17 +106,14 @@ export function NowPlayingBar() {
                   <Marquee text={track.artist} className="mt-0.5 text-xs text-muted" />
                 </div>
               </button>
-              <motion.button
-                whileTap={tap}
-                onClick={() => toggleLike(track.id)}
+              <LikeButton
+                liked={liked}
+                onToggle={() => toggleLike(track.id)}
                 className={clsx(
                   "shrink-0 text-muted transition-colors hover:text-fg",
                   liked && "text-accent hover:text-accent",
                 )}
-                aria-label="Like"
-              >
-                <Heart size={16} fill={liked ? "currentColor" : "none"} />
-              </motion.button>
+              />
               {/* Local files have no YouTube Music page to link anyone to. */}
               {!track.id.startsWith("local:") && (
                 <motion.button
@@ -137,14 +134,11 @@ export function NowPlayingBar() {
 
         <div className="flex w-[40%] flex-col items-center gap-2">
           <div className="flex items-center gap-5">
-            <motion.button
-              whileTap={tap}
+            <ShuffleButton
+              active={shuffle}
               onClick={toggleShuffle}
               className={clsx("text-muted transition-colors hover:text-fg", shuffle && "text-accent")}
-              aria-label="Shuffle"
-            >
-              <Shuffle size={16} />
-            </motion.button>
+            />
             <motion.button
               whileTap={tap}
               onClick={prev}

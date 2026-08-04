@@ -2,12 +2,10 @@ import { useEffect, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import {
   ChevronDown,
-  Heart,
   Pause,
   Play,
   Repeat,
   Repeat1,
-  Shuffle,
   Loader2,
   SkipBack,
   SkipForward,
@@ -18,6 +16,8 @@ import {
 } from "lucide-react";
 import clsx from "clsx";
 import { CoverArt } from "./CoverArt";
+import { LikeButton } from "./LikeButton";
+import { ShuffleButton } from "./ShuffleButton";
 import { Skeleton } from "./Skeleton";
 import { Visualizer } from "./Visualizer";
 import { VideoLayer } from "./VideoLayer";
@@ -204,13 +204,12 @@ export function NowPlayingExpanded() {
                   </div>
                   <div className="mt-1 truncate text-muted">{track.artist}</div>
                 </div>
-                <button
-                  onClick={() => toggleLike(track.id)}
+                <LikeButton
+                  liked={liked}
+                  onToggle={() => toggleLike(track.id)}
+                  size={20}
                   className={clsx("ml-2 text-muted hover:text-fg", liked && "text-accent")}
-                  aria-label="Like"
-                >
-                  <Heart size={20} fill={liked ? "currentColor" : "none"} />
-                </button>
+                />
               </div>
 
               <div className="mt-8 flex w-full max-w-md flex-col items-center gap-2">
@@ -237,13 +236,12 @@ export function NowPlayingExpanded() {
               <Visualizer className="mt-6 h-16 w-full max-w-md" />
 
               <div className="mt-4 flex items-center gap-6">
-                <button
+                <ShuffleButton
+                  active={shuffle}
                   onClick={toggleShuffle}
+                  size={20}
                   className={clsx("text-muted hover:text-fg", shuffle && "text-accent")}
-                  aria-label="Shuffle"
-                >
-                  <Shuffle size={20} />
-                </button>
+                />
                 <button onClick={prev} className="text-fg hover:text-fg" aria-label="Previous">
                   <SkipBack size={26} fill="currentColor" />
                 </button>
