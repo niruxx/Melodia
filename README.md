@@ -587,6 +587,17 @@ Artifacts land in `src-tauri/target/release/bundle/`:
 Tauri builds only for the machine it runs on — there's no cross-compiling, so
 each platform must be built on that platform.
 
+On a very new distro (bleeding-edge glibc/binutils, e.g. Fedora within its
+first few months) the `.AppImage` step can fail with `linuxdeploy` unable to
+`strip` the bundled libraries (`unknown type [0x13] section '.relr.dyn'`) —
+the downloaded `linuxdeploy` binary ships an older `strip` that predates the
+RELR relocations your system libraries use. It's a tooling-version mismatch,
+not a problem with this project. Build just the `.deb`/`.rpm` targets instead:
+
+```bash
+npm run tauri build -- --bundles deb,rpm
+```
+
 <details>
 <summary><b>Windows build tools</b></summary>
 
@@ -626,23 +637,30 @@ playback.
 sudo apt update
 sudo apt install -y build-essential curl wget file \
   libwebkit2gtk-4.1-dev librsvg2-dev libssl-dev \
-  libayatana-appindicator3-dev libxdo-dev \
+  libayatana-appindicator3-dev \
   libasound2-dev python3 python3-pip
 ```
 
 **Fedora**
 
 ```bash
-sudo dnf install -y @development-tools webkit2gtk4.1-devel librsvg2-devel \
-  openssl-devel libappindicator-gtk3-devel libxdo-devel \
+sudo dnf install -y @c-development webkit2gtk4.1-devel librsvg2-devel \
+  openssl-devel libayatana-appindicator-gtk3-devel \
   alsa-lib-devel python3 python3-pip
 ```
+
+`@development-tools` (the group most guides point at) is git/patch/etc. and
+does **not** include `gcc` — you want `@c-development` for the actual C
+toolchain. Likewise the appindicator devel package is
+`libayatana-appindicator-gtk3-devel`; the similarly-named
+`libappindicator-gtk3-devel` ships a different `.pc` file and won't satisfy
+Tauri's tray-icon feature.
 
 **Arch**
 
 ```bash
 sudo pacman -S --needed base-devel webkit2gtk-4.1 librsvg openssl \
-  libayatana-appindicator xdotool alsa-lib python python-pip
+  libayatana-appindicator alsa-lib python python-pip
 ```
 
 What the less obvious ones are for:
@@ -652,8 +670,30 @@ What the less obvious ones are for:
 | `libwebkit2gtk-4.1` | the webview the UI renders in |
 | `libasound2` / `alsa-lib` | audio output — rodio/cpal build against ALSA |
 | `libayatana-appindicator3` | the tray icon used by background playback |
-| `libxdo` / `xdotool` | tray and global shortcuts on X11 |
 | `libssl` / `openssl` | HTTPS |
+
+Rust itself isn't in these lists — install it separately with
+[rustup](https://www.rust-lang.org/tools/install)
+(`curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh`). Fedora's
+`rustup` package is just the launcher: after installing it you still need to
+run `rustup-init` (or `rustup default stable` if it's already initialized)
+to actually pull in a toolchain before `cargo` works.
+
+<details>
+<summary>Do the .deb/.rpm installers need these too?</summary>
+
+<br>
+
+No — the packages above are `-dev`/`-devel` headers only needed to *compile*
+Melodia. The built `.deb` and `.rpm` declare their own runtime dependencies
+(checked against a real build: `libwebkit2gtk-4.1-0`/`.so`, `libgtk-3-0`/`.so`,
+`libayatana-appindicator3-1`/`.so`) and `apt`/`dpkg` and `dnf`/`rpm` resolve
+those automatically on install. Everything else the binary links against
+(ALSA, X11, fontconfig, GStreamer, PulseAudio, …) comes in transitively as
+dependencies of GTK3/WebKitGTK themselves, which any desktop Linux install
+already has. Nothing needs to be installed by hand to *run* the packaged app.
+
+</details>
 
 </details>
 
