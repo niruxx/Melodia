@@ -12,7 +12,7 @@ Real playback, your real playlists, and a UI you can make your own.
 <img alt="Version" src="https://img.shields.io/badge/version-1.0.0-7c5cff?style=flat-square" />
 <img alt="Windows" src="https://img.shields.io/badge/Windows-tested-2ea44f?style=flat-square&logo=windows&logoColor=white" />
 <img alt="macOS" src="https://img.shields.io/badge/macOS-untested-8a8a8a?style=flat-square&logo=apple&logoColor=white" />
-<img alt="Linux" src="https://img.shields.io/badge/Linux-untested-8a8a8a?style=flat-square&logo=linux&logoColor=white" />
+<img alt="Linux" src="https://img.shields.io/badge/Linux-tested-8a8a8a?style=flat-square&logo=linux&logoColor=white" />
 </p>
 
 <p>
