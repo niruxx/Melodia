@@ -496,6 +496,9 @@ export function SettingsModal() {
                 </button>
                 <div className="text-center text-xs text-muted">
                   Melodia <span className="tabular-nums">{APP_VERSION}</span>
+                  {/* Sits under the version as the last thing in the panel —
+                      quiet enough not to compete with the controls above it. */}
+                  <div className="mt-1.5 tracking-wide text-muted/70">- niruxxdaboi -</div>
                 </div>
               </div>
             </div>
