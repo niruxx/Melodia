@@ -889,6 +889,10 @@ wallpaper is only visible because the surfaces above it stop being opaque.
 
 ---
 
+## TODO
+
+Spotify and Soundcloud Support ( Tabbed )
+
 ## Thanks
 
 - [ytmusicapi](https://github.com/sigma67/ytmusicapi) — the unofficial YouTube Music API this is built on
