@@ -13,4 +13,4 @@
  * "optional pre-release identifier in app version must be numeric-only".
  * Prefer a plain `MAJOR.MINOR.PATCH` and keep any wording in this constant.
  */
-export const APP_VERSION = "v1.0.0";
+export const APP_VERSION = "v3.0.0";

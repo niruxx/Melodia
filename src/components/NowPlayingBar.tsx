@@ -114,18 +114,25 @@ export function NowPlayingBar() {
                   liked && "text-accent hover:text-accent",
                 )}
               />
-              {/* Local files have no YouTube Music page to link anyone to. */}
-              {!track.id.startsWith("local:") && (
-                <motion.button
-                  whileTap={tap}
-                  onClick={() => void copyLink(trackShareUrl(track.id), "Song")}
-                  className="shrink-0 text-muted transition-colors hover:text-fg"
-                  aria-label="Copy share link"
-                  title="Copy share link"
-                >
-                  <Share2 size={16} />
-                </motion.button>
-              )}
+              {/* Local files have no page to link anyone to; a SoundCloud
+                  track only has one if the API actually handed back its
+                  permalink. */}
+              {(() => {
+                const isSoundCloudTrack = track.id.startsWith("sc:");
+                const url = isSoundCloudTrack ? track.permalinkUrl : trackShareUrl(track.id);
+                if (track.id.startsWith("local:") || !url) return null;
+                return (
+                  <motion.button
+                    whileTap={tap}
+                    onClick={() => void copyLink(url, "Song")}
+                    className="shrink-0 text-muted transition-colors hover:text-fg"
+                    aria-label="Copy share link"
+                    title="Copy share link"
+                  >
+                    <Share2 size={16} />
+                  </motion.button>
+                );
+              })()}
             </>
           ) : (
             <div className="text-sm text-muted">Nothing playing</div>
@@ -226,18 +233,21 @@ export function NowPlayingBar() {
           >
             <ListMusic size={18} />
           </motion.button>
-          <motion.button
-            whileTap={tap}
-            onClick={() => setCommentsOpen(!isCommentsOpen)}
-            className={clsx(
-              "text-muted transition-colors hover:text-fg",
-              isCommentsOpen && "text-accent",
-            )}
-            aria-label="Comments"
-            title="YouTube comments"
-          >
-            <MessageSquare size={18} />
-          </motion.button>
+          {/* YouTube comments only exist for YouTube tracks. */}
+          {track && !track.id.startsWith("local:") && !track.id.startsWith("sc:") && (
+            <motion.button
+              whileTap={tap}
+              onClick={() => setCommentsOpen(!isCommentsOpen)}
+              className={clsx(
+                "text-muted transition-colors hover:text-fg",
+                isCommentsOpen && "text-accent",
+              )}
+              aria-label="Comments"
+              title="YouTube comments"
+            >
+              <MessageSquare size={18} />
+            </motion.button>
+          )}
           <motion.button
             whileTap={tap}
             onClick={openDeviceModal}

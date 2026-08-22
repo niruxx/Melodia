@@ -6,6 +6,8 @@ import clsx from "clsx";
 import { usePlayerStore } from "../store/playerStore";
 import { useAuthStore } from "../store/authStore";
 import { useLibraryStore } from "../store/libraryStore";
+import { useScAuthStore } from "../store/scAuthStore";
+import { useScLibraryStore } from "../store/scLibraryStore";
 import { useSourceStore, type MusicSource } from "../store/sourceStore";
 import { useLocalLibraryStore } from "../store/localLibraryStore";
 import { usePlaylistModalStore } from "../store/playlistModalStore";
@@ -21,6 +23,7 @@ const navItems = [
 
 const sources: { id: MusicSource; label: string }[] = [
   { id: "youtube", label: "YouTube" },
+  { id: "soundcloud", label: "SoundCloud" },
   { id: "local", label: "Local" },
 ];
 
@@ -39,6 +42,10 @@ export function Sidebar() {
   const isSignedIn = useAuthStore((s) => s.state === "signed_in");
   const playlists = useLibraryStore((s) => s.playlists.data) ?? [];
   const albums = useLibraryStore((s) => s.albums.data) ?? [];
+  const isScSignedIn = useScAuthStore((s) => s.state === "signed_in");
+  const scPlaylists = useScLibraryStore((s) => s.playlists.data) ?? [];
+  const scArrivedId = useScLibraryStore((s) => s.arrivedId);
+  const clearScArrived = useScLibraryStore((s) => s.clearArrived);
   const activeSource = useSourceStore((s) => s.active);
   const setActiveSource = useSourceStore((s) => s.setActive);
   const localAlbums = useLocalLibraryStore((s) => s.albums);
@@ -57,9 +64,27 @@ export function Sidebar() {
     return () => clearTimeout(id);
   }, [arrivedId, clearArrived]);
 
+  useEffect(() => {
+    if (!scArrivedId) return;
+    const id = setTimeout(clearScArrived, 1600);
+    return () => clearTimeout(id);
+  }, [scArrivedId, clearScArrived]);
+
   const isLocal = activeSource === "local";
-  const allCollections = isLocal ? localAlbums : isSignedIn ? [...playlists, ...albums] : [];
+  const isSoundCloud = activeSource === "soundcloud";
+  // Each source keeps its own library entirely separate — see sourceStore.ts's
+  // "own tab, own state" convention — so which list/sign-in-state applies is
+  // one lookup per source rather than a chain of ad hoc booleans.
+  const sourceSignedIn = isSoundCloud ? isScSignedIn : isSignedIn;
+  const allCollections = isLocal
+    ? localAlbums
+    : isSoundCloud
+      ? (isScSignedIn ? scPlaylists : [])
+      : isSignedIn
+        ? [...playlists, ...albums]
+        : [];
   const items = allCollections.filter((c) => filter === "all" || c.kind === filter);
+  const activeArrivedId = isSoundCloud ? scArrivedId : arrivedId;
 
   function handleSourceChange(source: MusicSource) {
     setActiveSource(source);
@@ -124,9 +149,9 @@ export function Sidebar() {
         <div className="flex items-center gap-2 px-4 pb-2 pt-3">
           <Library size={20} className="text-muted" />
           <span className="text-sm font-semibold text-fg">Your Library</span>
-          {/* Creating playlists goes through the signed-in YouTube account, so
-              it's hidden for local playback and while signed out. */}
-          {!isLocal && isSignedIn && (
+          {/* Creating playlists goes through a signed-in account, so it's
+              hidden for local playback and while signed out. */}
+          {!isLocal && sourceSignedIn && (
             <motion.button
               whileHover={{ scale: 1.12 }}
               whileTap={{ scale: 0.88 }}
@@ -182,9 +207,11 @@ export function Sidebar() {
               Pick a local music folder in Settings to see your albums here.
             </p>
           )}
-          {!isLocal && !isSignedIn && (
+          {!isLocal && !sourceSignedIn && (
             <p className="px-2 py-3 text-xs text-muted">
-              Connect your YouTube Music account to see your playlists and albums here.
+              {isSoundCloud
+                ? "Connect your SoundCloud account to see your playlists here."
+                : "Connect your YouTube Music account to see your playlists and albums here."}
             </p>
           )}
           <div className="flex flex-col gap-0.5">
@@ -197,7 +224,7 @@ export function Sidebar() {
                     "flex items-center gap-3 rounded-md px-2 py-2 text-sm transition-colors",
                     isActive ? "bg-surface-2" : "hover:bg-surface-2",
                     // Only the playlist that was just created, and only once.
-                    c.id === arrivedId && "arrive",
+                    c.id === activeArrivedId && "arrive",
                   )
                 }
               >

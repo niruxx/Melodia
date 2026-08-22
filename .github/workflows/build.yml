@@ -1,0 +1,69 @@
+name: Build
+
+# Compiles Melodia on every push and PR against main, across the three
+# platforms the app targets (see README.md's build-tools sections). This is a
+# compile check, not a release: it stops short of `tauri build`'s bundling
+# step (no .msi/.dmg/.deb packaging, no code signing), so it's fast and needs
+# no secrets. Cutting an actual release is still the manual process documented
+# in README.md's "Cutting a release" section.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: build-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        platform: [windows-latest, macos-latest, ubuntu-latest]
+    runs-on: ${{ matrix.platform }}
+    steps:
+      - uses: actions/checkout@v4
+
+      # Exact package list from README.md's "Linux build tools" (Debian/Ubuntu
+      # block) — keep the two in sync if either changes.
+      - name: Install Linux build dependencies
+        if: matrix.platform == 'ubuntu-latest'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential curl wget file \
+            libwebkit2gtk-4.1-dev librsvg2-dev libssl-dev \
+            libayatana-appindicator3-dev libasound2-dev
+
+      - name: Set up Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache Rust build
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install frontend dependencies
+        run: npm ci
+
+      # Runs `tsc` and the Vite build — matches `npm run tauri build`'s own
+      # `beforeBuildCommand`, so a type error or bundling failure shows up
+      # here exactly like it would in a real release build.
+      - name: Build frontend
+        run: npm run build
+
+      - name: Compile Rust
+        working-directory: src-tauri
+        run: cargo build --locked

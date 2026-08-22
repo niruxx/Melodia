@@ -8,6 +8,10 @@ export type Track = {
   /** Per-playlist handle YouTube requires to remove or reorder this entry.
    * Only present on playlists the signed-in account owns. */
   setVideoId?: string;
+  /** SoundCloud tracks only — their share link, since (unlike a YouTube
+   * videoId) a bare SoundCloud track id can't be turned into a URL on its
+   * own. */
+  permalinkUrl?: string;
 };
 
 export type PlaylistPrivacy = "PUBLIC" | "UNLISTED" | "PRIVATE";

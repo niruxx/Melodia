@@ -14,6 +14,8 @@ import { usePlayerStore } from "../store/playerStore";
 import { useSetupStore } from "../store/setupStore";
 import { useUpdateStore } from "../store/updateStore";
 import { useStreamAuthStore } from "../store/streamAuthStore";
+import { useScAuthStore } from "../store/scAuthStore";
+import { useScAccountStore } from "../store/scAccountStore";
 import { ThemeSettings } from "./ThemeSettings";
 import { useLocalLibraryStore } from "../store/localLibraryStore";
 import { APP_VERSION } from "../lib/version";
@@ -43,6 +45,11 @@ export function SettingsModal() {
   const streamFormat = usePlayerStore((s) => s.streamFormat);
   const restartSetup = useSetupStore((s) => s.restart);
   const openSetupStep = useSetupStore((s) => s.openStep);
+
+  const scAuthState = useScAuthStore((s) => s.state);
+  const scOpenModal = useScAuthStore((s) => s.openModal);
+  const scDoSignOut = useScAuthStore((s) => s.doSignOut);
+  const scAccount = useScAccountStore((s) => s.info);
 
   const streamAuthEnabled = useStreamAuthStore((s) => s.enabled);
   const streamAuthAvailable = useStreamAuthStore((s) => s.available);
@@ -146,6 +153,28 @@ export function SettingsModal() {
               </div>
 
               {error && <p className="text-sm text-red-400">{error}</p>}
+
+              <div className="flex items-center justify-between">
+                <div>
+                  <div className="text-sm font-semibold">SoundCloud account</div>
+                  <div className="text-xs text-muted">
+                    {scAuthState === "signed_in"
+                      ? (scAccount?.username ?? "Connected")
+                      : "Not connected — playlists, likes, and followed artists need a sign-in."}
+                  </div>
+                </div>
+                <button
+                  onClick={() => (scAuthState === "signed_in" ? void scDoSignOut() : scOpenModal())}
+                  className={
+                    "shrink-0 rounded-full px-4 py-1.5 text-xs font-semibold transition-colors " +
+                    (scAuthState === "signed_in"
+                      ? "bg-surface-3 text-fg hover:bg-surface-3/70"
+                      : "bg-accent text-black")
+                  }
+                >
+                  {scAuthState === "signed_in" ? "Sign out" : "Connect"}
+                </button>
+              </div>
 
               <div className="flex items-center justify-between">
                 <div>

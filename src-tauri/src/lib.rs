@@ -10,6 +10,7 @@ mod network;
 mod playback;
 mod python;
 mod sidecar;
+mod soundcloud_login;
 mod update;
 
 use background::BackgroundMode;
@@ -123,6 +124,22 @@ pub fn run() {
             commands::ytm_get_lyrics,
             commands::ytm_get_comments,
             commands::ytm_get_video_url,
+            commands::sc_auth_status,
+            commands::sc_set_auth,
+            commands::sc_sign_out,
+            commands::sc_get_account_info,
+            commands::sc_get_home,
+            commands::sc_get_library_playlists,
+            commands::sc_get_library_likes,
+            commands::sc_get_library_followings,
+            commands::sc_get_playlist,
+            commands::sc_create_playlist,
+            commands::sc_edit_playlist,
+            commands::sc_delete_playlist,
+            commands::sc_add_playlist_items,
+            commands::sc_remove_playlist_items,
+            commands::sc_reorder_playlist_items,
+            commands::sc_search,
             commands::app_relaunch,
             python::python_status,
             python::python_open_installer,
@@ -138,6 +155,7 @@ pub fn run() {
             network::network_broadcast_state,
             network::network_disconnect,
             commands::playback_play,
+            commands::playback_play_soundcloud,
             commands::playback_play_local,
             commands::playback_list_outputs,
             commands::playback_set_output,
@@ -154,6 +172,8 @@ pub fn run() {
             artwork::artwork_palette,
             google_login::google_login_start,
             google_login::google_login_cancel,
+            soundcloud_login::soundcloud_login_start,
+            soundcloud_login::soundcloud_login_cancel,
             background::set_background_mode,
         ])
         .run(tauri::generate_context!())

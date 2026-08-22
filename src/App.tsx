@@ -11,6 +11,7 @@ import { NowPlayingExpanded } from "./components/NowPlayingExpanded";
 import { QueueDrawer } from "./components/QueueDrawer";
 import { CommentsDrawer } from "./components/CommentsDrawer";
 import { SignInModal } from "./components/SignInModal";
+import { SoundCloudSignInModal } from "./components/SoundCloudSignInModal";
 import { SettingsModal } from "./components/SettingsModal";
 import { DeviceConnectModal } from "./components/DeviceConnectModal";
 import { SetupWizard } from "./components/SetupWizard";
@@ -38,6 +39,9 @@ import { RecentlyPlayed } from "./pages/RecentlyPlayed";
 import { LikedSongs } from "./pages/LikedSongs";
 import { useAuthStore } from "./store/authStore";
 import { useLibraryStore } from "./store/libraryStore";
+import { useScAuthStore } from "./store/scAuthStore";
+import { useScLibraryStore } from "./store/scLibraryStore";
+import { useScAccountStore } from "./store/scAccountStore";
 import { useDiscordStore } from "./store/discordStore";
 import { usePlayerStore } from "./store/playerStore";
 import { useNetworkStore } from "./store/networkStore";
@@ -86,6 +90,7 @@ function AnimatedRoutes() {
 
 function App() {
   const authState = useAuthStore((s) => s.state);
+  const scAuthState = useScAuthStore((s) => s.state);
   const currentTrack = usePlayerStore((s) => s.currentTrack());
   const isPlaying = usePlayerStore((s) => s.isPlaying);
   const isMini = useMiniPlayerStore((s) => s.active);
@@ -106,6 +111,7 @@ function App() {
 
   useEffect(() => {
     useAuthStore.getState().init();
+    useScAuthStore.getState().init();
     useDiscordStore.getState().init();
     useNetworkStore.getState().init();
     useAudioSettingsStore.getState().init();
@@ -156,6 +162,16 @@ function App() {
       useAccountStore.getState().reset();
     }
   }, [authState]);
+
+  useEffect(() => {
+    if (scAuthState === "signed_in") {
+      useScLibraryStore.getState().fetchAll();
+      useScAccountStore.getState().fetch();
+    } else {
+      useScLibraryStore.getState().reset();
+      useScAccountStore.getState().reset();
+    }
+  }, [scAuthState]);
 
   useEffect(() => {
     if (!currentTrack) return;
@@ -217,6 +233,7 @@ function App() {
       <CommentsDrawer />
       <NowPlayingExpanded />
       <SignInModal />
+      <SoundCloudSignInModal />
       <SettingsModal />
       <DeviceConnectModal />
       <PlaylistFormModal />

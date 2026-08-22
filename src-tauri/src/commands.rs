@@ -262,6 +262,175 @@ pub async fn ytm_get_comments(
         .await
 }
 
+// ---- SoundCloud -----------------------------------------------------------
+//
+// Thin wrappers over the sidecar's `sc_*` commands, same shape as the `ytm_*`
+// block above.
+
+#[tauri::command]
+pub async fn sc_auth_status(sidecar: State<'_, Sidecar>) -> Result<Value, String> {
+    sidecar.call("sc_auth_status", serde_json::json!({})).await
+}
+
+#[tauri::command]
+pub async fn sc_set_auth(sidecar: State<'_, Sidecar>, token: String) -> Result<Value, String> {
+    sidecar
+        .call("sc_set_auth", serde_json::json!({ "token": token }))
+        .await
+}
+
+#[tauri::command]
+pub async fn sc_sign_out(sidecar: State<'_, Sidecar>) -> Result<Value, String> {
+    sidecar.call("sc_sign_out", serde_json::json!({})).await
+}
+
+#[tauri::command]
+pub async fn sc_get_account_info(sidecar: State<'_, Sidecar>) -> Result<Value, String> {
+    sidecar
+        .call("sc_get_account_info", serde_json::json!({}))
+        .await
+}
+
+#[tauri::command]
+pub async fn sc_get_home(sidecar: State<'_, Sidecar>) -> Result<Value, String> {
+    sidecar.call("sc_get_home", serde_json::json!({})).await
+}
+
+#[tauri::command]
+pub async fn sc_get_library_playlists(sidecar: State<'_, Sidecar>) -> Result<Value, String> {
+    sidecar
+        .call("sc_get_library_playlists", serde_json::json!({}))
+        .await
+}
+
+#[tauri::command]
+pub async fn sc_get_library_likes(sidecar: State<'_, Sidecar>) -> Result<Value, String> {
+    sidecar
+        .call("sc_get_library_likes", serde_json::json!({}))
+        .await
+}
+
+#[tauri::command]
+pub async fn sc_get_library_followings(sidecar: State<'_, Sidecar>) -> Result<Value, String> {
+    sidecar
+        .call("sc_get_library_followings", serde_json::json!({}))
+        .await
+}
+
+#[tauri::command]
+pub async fn sc_get_playlist(
+    sidecar: State<'_, Sidecar>,
+    playlist_id: String,
+) -> Result<Value, String> {
+    sidecar
+        .call("sc_get_playlist", serde_json::json!({ "playlistId": playlist_id }))
+        .await
+}
+
+#[tauri::command]
+pub async fn sc_create_playlist(
+    sidecar: State<'_, Sidecar>,
+    title: String,
+    description: Option<String>,
+    track_ids: Vec<String>,
+    privacy: Option<String>,
+) -> Result<Value, String> {
+    sidecar
+        .call(
+            "sc_create_playlist",
+            serde_json::json!({
+                "title": title,
+                "description": description,
+                "trackIds": track_ids,
+                "privacy": privacy,
+            }),
+        )
+        .await
+}
+
+#[tauri::command]
+pub async fn sc_edit_playlist(
+    sidecar: State<'_, Sidecar>,
+    playlist_id: String,
+    title: Option<String>,
+    description: Option<String>,
+    privacy: Option<String>,
+) -> Result<Value, String> {
+    sidecar
+        .call(
+            "sc_edit_playlist",
+            serde_json::json!({
+                "playlistId": playlist_id,
+                "title": title,
+                "description": description,
+                "privacy": privacy,
+            }),
+        )
+        .await
+}
+
+#[tauri::command]
+pub async fn sc_delete_playlist(
+    sidecar: State<'_, Sidecar>,
+    playlist_id: String,
+) -> Result<Value, String> {
+    sidecar
+        .call(
+            "sc_delete_playlist",
+            serde_json::json!({ "playlistId": playlist_id }),
+        )
+        .await
+}
+
+#[tauri::command]
+pub async fn sc_add_playlist_items(
+    sidecar: State<'_, Sidecar>,
+    playlist_id: String,
+    track_ids: Vec<String>,
+) -> Result<Value, String> {
+    sidecar
+        .call(
+            "sc_add_playlist_items",
+            serde_json::json!({ "playlistId": playlist_id, "trackIds": track_ids }),
+        )
+        .await
+}
+
+#[tauri::command]
+pub async fn sc_remove_playlist_items(
+    sidecar: State<'_, Sidecar>,
+    playlist_id: String,
+    track_ids: Vec<String>,
+) -> Result<Value, String> {
+    sidecar
+        .call(
+            "sc_remove_playlist_items",
+            serde_json::json!({ "playlistId": playlist_id, "trackIds": track_ids }),
+        )
+        .await
+}
+
+#[tauri::command]
+pub async fn sc_reorder_playlist_items(
+    sidecar: State<'_, Sidecar>,
+    playlist_id: String,
+    ordered_track_ids: Vec<String>,
+) -> Result<Value, String> {
+    sidecar
+        .call(
+            "sc_reorder_playlist_items",
+            serde_json::json!({ "playlistId": playlist_id, "orderedTrackIds": ordered_track_ids }),
+        )
+        .await
+}
+
+#[tauri::command]
+pub async fn sc_search(sidecar: State<'_, Sidecar>, query: String) -> Result<Value, String> {
+    sidecar
+        .call("sc_search", serde_json::json!({ "query": query }))
+        .await
+}
+
 #[tauri::command]
 pub async fn discord_connect(discord: State<'_, Discord>, app_id: String) -> Result<(), String> {
     discord.connect(app_id).await
@@ -342,6 +511,26 @@ pub async fn playback_play(
         "abr": data.get("abr").cloned().unwrap_or(Value::Null),
         "acodec": data.get("acodec").cloned().unwrap_or(Value::Null),
     }))
+}
+
+#[tauri::command]
+pub async fn playback_play_soundcloud(
+    sidecar: State<'_, Sidecar>,
+    playback: State<'_, Playback>,
+    track_id: String,
+) -> Result<Value, String> {
+    let data = sidecar
+        .call("sc_get_stream_url", serde_json::json!({ "trackId": track_id }))
+        .await?;
+    let url = data
+        .get("url")
+        .and_then(Value::as_str)
+        .ok_or_else(|| "couldn't resolve an audio stream for this track".to_string())?
+        .to_string();
+    // The resolved URL is already a fully-signed CDN link — no extra headers
+    // are needed the way YouTube's stream URLs need yt-dlp's browser-shaped ones.
+    playback.play(url, std::collections::HashMap::new())?;
+    Ok(serde_json::json!({}))
 }
 
 #[tauri::command]

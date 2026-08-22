@@ -5,6 +5,7 @@ import { PlayControls } from "../components/PlayControls";
 import { allTracks } from "../lib/mockData";
 import { usePlayerStore } from "../store/playerStore";
 import { useLibraryStore } from "../store/libraryStore";
+import { useScLibraryStore } from "../store/scLibraryStore";
 import type { Track } from "../lib/types";
 
 export function LikedSongs() {
@@ -13,7 +14,12 @@ export function LikedSongs() {
   const trackCache = useLibraryStore((s) => s.trackCache);
   const playlistCache = useLibraryStore((s) => s.playlistCache);
   const history = useLibraryStore((s) => s.history.data);
+  const scTrackCache = useScLibraryStore((s) => s.trackCache);
+  const scPlaylistCache = useScLibraryStore((s) => s.playlistCache);
 
+  // Melodia's own heart toggle is source-agnostic (it just keys off track id),
+  // so it can favorite a track from any source — this pool has to draw from
+  // every source's cache, not just YouTube Music's.
   const tracks = useMemo(() => {
     const known = new Map<string, Track>();
     for (const t of allTracks) known.set(t.id, t);
@@ -22,8 +28,12 @@ export function LikedSongs() {
       for (const t of detail.tracks) known.set(t.id, t);
     }
     for (const t of history ?? []) known.set(t.id, t);
+    for (const t of Object.values(scTrackCache)) known.set(t.id, t);
+    for (const detail of Object.values(scPlaylistCache)) {
+      for (const t of detail.tracks) known.set(t.id, t);
+    }
     return Array.from(known.values()).filter((t) => likedIds[t.id]);
-  }, [likedIds, trackCache, playlistCache, history]);
+  }, [likedIds, trackCache, playlistCache, history, scTrackCache, scPlaylistCache]);
 
   function handlePlay() {
     if (tracks.length > 0) playTrack(tracks[0], tracks);

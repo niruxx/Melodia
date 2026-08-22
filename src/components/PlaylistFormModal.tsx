@@ -2,8 +2,11 @@ import { useEffect, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { Loader2, X } from "lucide-react";
 import { useLibraryStore } from "../store/libraryStore";
-import { usePlaylistModalStore } from "../store/playlistModalStore";
+import { useScLibraryStore } from "../store/scLibraryStore";
+import { useSourceStore } from "../store/sourceStore";
+import { usePlaylistModalStore, type PlaylistForm } from "../store/playlistModalStore";
 import { toast } from "../store/toastStore";
+import { SC_ID_PREFIX } from "../lib/soundcloud";
 import type { PlaylistPrivacy } from "../lib/types";
 
 const privacyOptions: { value: PlaylistPrivacy; label: string; hint: string }[] = [
@@ -12,13 +15,28 @@ const privacyOptions: { value: PlaylistPrivacy; label: string; hint: string }[] 
   { value: "PUBLIC", label: "Public", hint: "Anyone can find it" },
 ];
 
+/** Which provider a form submission should hit — SoundCloud playlists and
+ * YouTube Music playlists live in separate stores (see sourceStore.ts's
+ * "parallel, not merged" convention), so this is the one place that has to
+ * decide between them. An edit knows from its own collection's id prefix; a
+ * fresh create infers it from the seed tracks, falling back to whichever tab
+ * is active when there's nothing else to go on. */
+function targetsSoundCloud(form: PlaylistForm, activeSource: string): boolean {
+  if (form.mode === "edit") return form.collection.id.startsWith(SC_ID_PREFIX);
+  if (form.tracks.length > 0) return form.tracks[0].id.startsWith(SC_ID_PREFIX);
+  return activeSource === "soundcloud";
+}
+
 /** Create-a-playlist and edit-details share one form; `form.mode` picks the copy. */
 export function PlaylistFormModal() {
   const form = usePlaylistModalStore((s) => s.form);
   const close = usePlaylistModalStore((s) => s.closeForm);
+  const activeSource = useSourceStore((s) => s.active);
   const createPlaylist = useLibraryStore((s) => s.createPlaylist);
   const editPlaylist = useLibraryStore((s) => s.editPlaylist);
   const addTracksToPlaylist = useLibraryStore((s) => s.addTracksToPlaylist);
+  const scCreatePlaylist = useScLibraryStore((s) => s.createPlaylist);
+  const scEditPlaylist = useScLibraryStore((s) => s.editPlaylist);
 
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
@@ -58,10 +76,27 @@ export function PlaylistFormModal() {
 
     setSaving(true);
     setError(null);
+    const isSoundCloud = targetsSoundCloud(form, activeSource);
     try {
       if (form.mode === "edit") {
-        await editPlaylist(form.collection.id, { title: trimmed, description, privacy });
+        if (isSoundCloud) {
+          await scEditPlaylist(form.collection.id, { title: trimmed, description, privacy });
+        } else {
+          await editPlaylist(form.collection.id, { title: trimmed, description, privacy });
+        }
         toast.success("Playlist updated");
+      } else if (isSoundCloud) {
+        await scCreatePlaylist(
+          trimmed,
+          form.tracks.map((t) => t.id),
+          description,
+          privacy,
+        );
+        toast.success(
+          form.tracks.length > 0
+            ? `Created "${trimmed}" with ${form.tracks.length} song${form.tracks.length === 1 ? "" : "s"}`
+            : `Created "${trimmed}"`,
+        );
       } else {
         const id = await createPlaylist(trimmed, description, privacy);
         if (form.tracks.length > 0) {

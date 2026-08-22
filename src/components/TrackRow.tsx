@@ -58,7 +58,11 @@ export function TrackRow({
   const dragControls = useDragControls();
 
   const isCurrent = current?.id === track.id;
-  const isLocal = track.id.startsWith("local:");
+  const isSoundCloudTrack = track.id.startsWith("sc:");
+  // A bare SoundCloud track id can't be turned into a URL the way a YouTube
+  // videoId can — only the track's own permalink works, and it's not always
+  // present on every shape the API hands back (e.g. a stub in a playlist).
+  const shareUrl = isSoundCloudTrack ? track.permalinkUrl : trackShareUrl(track.id);
 
   function handleRowClick() {
     if (isCurrent) {
@@ -116,12 +120,12 @@ export function TrackRow({
             liked && "text-accent opacity-100",
           )}
         />
-        {!isLocal && (
+        {shareUrl && (
           <motion.button
             whileTap={{ scale: 0.85 }}
             onClick={(e) => {
               e.stopPropagation();
-              void copyLink(trackShareUrl(track.id), "Song");
+              void copyLink(shareUrl, "Song");
             }}
             className="text-muted opacity-0 transition-opacity hover:text-fg focus-visible:opacity-100 group-hover:opacity-100"
             aria-label={`Copy share link for ${track.title}`}

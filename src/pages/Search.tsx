@@ -8,11 +8,14 @@ import { useAuthStore } from "../store/authStore";
 import { useSourceStore } from "../store/sourceStore";
 import { useLocalLibraryStore } from "../store/localLibraryStore";
 import { searchTracks } from "../lib/ytmusic";
+import { searchTracks as searchSoundCloudTracks } from "../lib/soundcloud";
 import type { Track } from "../lib/types";
 
 export function Search() {
   const authState = useAuthStore((s) => s.state);
-  const isLocal = useSourceStore((s) => s.active === "local");
+  const active = useSourceStore((s) => s.active);
+  const isLocal = active === "local";
+  const isSoundCloud = active === "soundcloud";
   const localTracks = useLocalLibraryStore((s) => s.tracks);
   const [params] = useSearchParams();
   const query = (params.get("q") ?? "").trim();
@@ -39,6 +42,26 @@ export function Search() {
       setError(null);
       return;
     }
+    if (isSoundCloud) {
+      // SoundCloud's search works unauthenticated with just a client_id, so
+      // browsing doesn't need to wait on a sign-in the way the library does.
+      let cancelled = false;
+      setLoading(true);
+      setError(null);
+      searchSoundCloudTracks(query)
+        .then((tracks) => {
+          if (!cancelled) setResults(tracks);
+        })
+        .catch((e) => {
+          if (!cancelled) setError(String(e));
+        })
+        .finally(() => {
+          if (!cancelled) setLoading(false);
+        });
+      return () => {
+        cancelled = true;
+      };
+    }
     if (authState !== "signed_in") {
       setResults([]);
       return;
@@ -59,9 +82,9 @@ export function Search() {
     return () => {
       cancelled = true;
     };
-  }, [query, authState, isLocal, localTracks]);
+  }, [query, authState, isLocal, isSoundCloud, localTracks]);
 
-  if (!isLocal && authState !== "signed_in") {
+  if (!isLocal && !isSoundCloud && authState !== "signed_in") {
     return <SignInPrompt />;
   }
 

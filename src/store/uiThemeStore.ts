@@ -1,10 +1,33 @@
 import { create } from "zustand";
+import { getCurrentWebview } from "@tauri-apps/api/webview";
 
 const THEME_KEY = "melodia:ui-theme";
 const ACCENT_KEY = "melodia:ui-accent";
 const GRADIENT_KEY = "melodia:ui-gradient";
 const WASH_SIDEBAR_KEY = "melodia:ui-wash-sidebar";
 const WASH_TITLEBAR_KEY = "melodia:ui-wash-titlebar";
+const UI_SCALE_KEY = "melodia:ui-scale";
+
+export const DEFAULT_UI_SCALE = 1;
+export const MIN_UI_SCALE = 0.8;
+export const MAX_UI_SCALE = 1.5;
+export const UI_SCALE_STEP = 0.05;
+
+function clampUiScale(value: number): number {
+  if (!Number.isFinite(value)) return DEFAULT_UI_SCALE;
+  return Math.min(MAX_UI_SCALE, Math.max(MIN_UI_SCALE, value));
+}
+
+/** Native webview zoom, not a CSS transform: the app mixes rem-based Tailwind
+ * classes with plain pixel sizes (every lucide icon takes its size as a raw
+ * `px` prop), so a font-size or `transform: scale` hack would scale those two
+ * inconsistently. Zooming the webview itself scales everything uniformly, the
+ * same way a browser's own Ctrl+/- does. */
+function applyUiScale(scale: number) {
+  void getCurrentWebview()
+    .setZoom(scale)
+    .catch(() => {});
+}
 
 /**
  * Mirrors the `@theme` tokens declared in `src/index.css`. Tailwind v4 compiles
@@ -216,6 +239,8 @@ type UiThemeStore = {
    *  it's the one piece of chrome that reads as part of the OS, so tinting it
    *  is a stronger statement than tinting a panel inside the app. */
   washTitlebar: boolean;
+  /** Native webview zoom factor — 1 is 100%. */
+  uiScale: number;
 
   init: () => void;
   setTheme: (id: string) => void;
@@ -224,6 +249,7 @@ type UiThemeStore = {
   setGradient: (intensity: GradientIntensity) => void;
   setWashSidebar: (value: boolean) => void;
   setWashTitlebar: (value: boolean) => void;
+  setUiScale: (value: number) => void;
   colors: () => ThemeColors;
 };
 
@@ -233,6 +259,7 @@ export const useUiThemeStore = create<UiThemeStore>((set, get) => ({
   gradient: "subtle",
   washSidebar: false,
   washTitlebar: false,
+  uiScale: DEFAULT_UI_SCALE,
 
   init: () => {
     const storedId = localStorage.getItem(THEME_KEY);
@@ -256,15 +283,20 @@ export const useUiThemeStore = create<UiThemeStore>((set, get) => ({
       }
     }
 
+    const rawScale = Number(localStorage.getItem(UI_SCALE_KEY));
+    const uiScale = rawScale ? clampUiScale(rawScale) : DEFAULT_UI_SCALE;
+
     set({
       themeId,
       accent,
       gradient,
       washSidebar: localStorage.getItem(WASH_SIDEBAR_KEY) === "true",
       washTitlebar: localStorage.getItem(WASH_TITLEBAR_KEY) === "true",
+      uiScale,
     });
     applyColors(resolveColors(themeId, accent));
     applyGradient(themeId, gradient);
+    applyUiScale(uiScale);
   },
 
   setTheme: (id) => {
@@ -294,6 +326,13 @@ export const useUiThemeStore = create<UiThemeStore>((set, get) => ({
   setWashTitlebar: (value) => {
     localStorage.setItem(WASH_TITLEBAR_KEY, String(value));
     set({ washTitlebar: value });
+  },
+
+  setUiScale: (value) => {
+    const clamped = clampUiScale(value);
+    localStorage.setItem(UI_SCALE_KEY, String(clamped));
+    set({ uiScale: clamped });
+    applyUiScale(clamped);
   },
 
   setAccent: (index, color) => {

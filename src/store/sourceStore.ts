@@ -1,6 +1,6 @@
 import { create } from "zustand";
 
-export type MusicSource = "youtube" | "local";
+export type MusicSource = "youtube" | "local" | "soundcloud";
 
 const STORAGE_KEY = "melodia:active-source";
 
@@ -11,7 +11,7 @@ type SourceStore = {
 };
 
 function isSource(value: string | null): value is MusicSource {
-  return value === "youtube" || value === "local";
+  return value === "youtube" || value === "local" || value === "soundcloud";
 }
 
 export const useSourceStore = create<SourceStore>((set) => ({

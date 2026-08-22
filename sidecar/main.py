@@ -42,6 +42,17 @@ except Exception as _import_error:
         "them, or run: pip install -r sidecar/requirements.txt"
     )
 
+# SoundCloud only needs `requests`, so its import is guarded separately: a
+# YouTube Music package problem shouldn't take SoundCloud down, and vice
+# versa -- each provider's commands only fail on its own provider's error.
+try:
+    import soundcloud as sc
+except Exception as _sc_import_error:
+    sc = None
+    SC_STARTUP_ERROR = f"the Python helper's SoundCloud module failed to load ({_sc_import_error})."
+else:
+    SC_STARTUP_ERROR = None
+
 # stdout *is* the wire protocol, so a stray print or a library's progress output
 # lands in the middle of a response line and corrupts it. Keep the real stdout
 # private and point `sys.stdout` at stderr, which the app captures to a log.
@@ -87,6 +98,9 @@ try:
 except Exception as e:
     if STARTUP_ERROR is None:
         STARTUP_ERROR = f"the Python helper can't write to its data folder ({DATA_DIR}): {e}"
+if sc is not None:
+    sc.init(DATA_DIR)
+
 CONFIG_PATH = DATA_DIR / "ytmusic_config.json"
 TOKEN_PATH = DATA_DIR / "ytmusic_oauth.json"
 BROWSER_AUTH_PATH = DATA_DIR / "ytmusic_browser.json"
@@ -864,7 +878,10 @@ def cmd_ping(_args):
     app can then report *why* it is unusable instead of watching a process go
     quiet, and can try a different interpreter if this one lacks the packages.
     """
-    return {"startupError": STARTUP_ERROR}
+    return {
+        "startupError": STARTUP_ERROR,
+        "scStartupError": SC_STARTUP_ERROR or (sc.STARTUP_ERROR if sc is not None else None),
+    }
 
 
 COMMANDS = {
@@ -896,12 +913,15 @@ COMMANDS = {
     "set_stream_auth": cmd_set_stream_auth,
 }
 
-
 # Commands allowed to run off the main loop. Everything else stays strictly
 # ordered, because auth and the playlist mutations depend on that ordering.
 # Comment fetches take seconds, and blocking the loop on one would delay
 # starting the next track.
 THREADED_COMMANDS = {"get_comments", "get_video_url"}
+
+if sc is not None:
+    COMMANDS.update(sc.COMMANDS)
+    THREADED_COMMANDS |= sc.THREADED_COMMANDS
 
 _stdout_lock = threading.Lock()
 
@@ -936,8 +956,16 @@ def respond(resp):
 
 def run_command(req_id, cmd, args):
     try:
-        if STARTUP_ERROR is not None and cmd != "ping":
-            raise RuntimeError(STARTUP_ERROR)
+        if cmd != "ping":
+            # Each provider only fails on its own startup error, so a broken
+            # ytmusicapi/yt-dlp install doesn't take SoundCloud down and a
+            # broken SoundCloud module doesn't take YouTube Music down.
+            if str(cmd).startswith("sc_"):
+                startup_error = SC_STARTUP_ERROR or (sc.STARTUP_ERROR if sc is not None else None)
+            else:
+                startup_error = STARTUP_ERROR
+            if startup_error is not None:
+                raise RuntimeError(startup_error)
         handler = COMMANDS.get(cmd)
         if handler is None:
             raise ValueError(f"unknown command: {cmd}")

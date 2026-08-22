@@ -3,8 +3,10 @@ import { AnimatePresence, motion } from "framer-motion";
 import { Loader2, Plus, X } from "lucide-react";
 import { CoverArt } from "./CoverArt";
 import { useLibraryStore } from "../store/libraryStore";
+import { useScLibraryStore } from "../store/scLibraryStore";
 import { usePlaylistModalStore } from "../store/playlistModalStore";
 import { toast } from "../store/toastStore";
+import { SC_ID_PREFIX } from "../lib/soundcloud";
 
 /** Destination picker for "Add to playlist". */
 export function AddToPlaylistModal() {
@@ -13,19 +15,29 @@ export function AddToPlaylistModal() {
   const openCreate = usePlaylistModalStore((s) => s.openCreate);
   const playlists = useLibraryStore((s) => s.playlists.data);
   const addTracksToPlaylist = useLibraryStore((s) => s.addTracksToPlaylist);
+  const scPlaylists = useScLibraryStore((s) => s.playlists.data);
+  const scAddTracksToPlaylist = useScLibraryStore((s) => s.addTracksToPlaylist);
 
   const [pendingId, setPendingId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const count = tracks?.length ?? 0;
-  const options = playlists ?? [];
+  // Which provider's playlists to offer follows the tracks being added, not
+  // whichever tab happens to be open — a SoundCloud track can only ever go
+  // into a SoundCloud playlist.
+  const isSoundCloud = tracks?.[0]?.id.startsWith(SC_ID_PREFIX) ?? false;
+  const options = (isSoundCloud ? scPlaylists : playlists) ?? [];
 
   async function handlePick(id: string, title: string) {
     if (!tracks || pendingId) return;
     setPendingId(id);
     setError(null);
     try {
-      await addTracksToPlaylist(id, tracks);
+      if (isSoundCloud) {
+        await scAddTracksToPlaylist(id, tracks);
+      } else {
+        await addTracksToPlaylist(id, tracks);
+      }
       toast.success(`Added ${count} song${count === 1 ? "" : "s"} to "${title}"`);
       close();
     } catch (e) {

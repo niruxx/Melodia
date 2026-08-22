@@ -12,17 +12,24 @@ import { useAuthStore } from "../store/authStore";
 import { useLibraryStore } from "../store/libraryStore";
 import { useSourceStore } from "../store/sourceStore";
 import { useLocalLibraryStore } from "../store/localLibraryStore";
+import { useScAuthStore } from "../store/scAuthStore";
+import { useScLibraryStore } from "../store/scLibraryStore";
 import { useContextMenuStore } from "../store/contextMenuStore";
 import { usePlaylistModalStore } from "../store/playlistModalStore";
 import { toast } from "../store/toastStore";
 import { collectionShareUrl, copyLink, openLink } from "../lib/share";
+import { SC_ID_PREFIX } from "../lib/soundcloud";
 import type { Track } from "../lib/types";
+
+const SC_SONG_PREFIX = `${SC_ID_PREFIX}song-`;
 
 export function Playlist() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const authState = useAuthStore((s) => s.state);
-  const isLocal = useSourceStore((s) => s.active === "local");
+  const active = useSourceStore((s) => s.active);
+  const isLocal = active === "local";
+  const isSoundCloud = active === "soundcloud";
 
   // Subscribe to these slices so this page re-renders once library data arrives.
   useLibraryStore((s) => s.playlists.data);
@@ -35,6 +42,19 @@ export function Playlist() {
   const removeTrackFromPlaylist = useLibraryStore((s) => s.removeTrackFromPlaylist);
   const reorderPlaylistTracks = useLibraryStore((s) => s.reorderPlaylistTracks);
   const deletePlaylist = useLibraryStore((s) => s.deletePlaylist);
+
+  const scAuthState = useScAuthStore((s) => s.state);
+  const scOpenModal = useScAuthStore((s) => s.openModal);
+  useScLibraryStore((s) => s.playlists.data);
+  useScLibraryStore((s) => s.home.data);
+  const scTrackCache = useScLibraryStore((s) => s.trackCache);
+  const scDetail = useScLibraryStore((s) => (id ? s.playlistCache[id] : undefined));
+  const scFindCollection = useScLibraryStore((s) => s.findCollection);
+  const scGetPlaylistDetail = useScLibraryStore((s) => s.getPlaylistDetail);
+  const scRemoveTrackFromPlaylist = useScLibraryStore((s) => s.removeTrackFromPlaylist);
+  const scReorderPlaylistTracks = useScLibraryStore((s) => s.reorderPlaylistTracks);
+  const scDeletePlaylist = useScLibraryStore((s) => s.deletePlaylist);
+
   const playTrack = usePlayerStore((s) => s.playTrack);
   const openMenu = useContextMenuStore((s) => s.openMenu);
   const openEdit = usePlaylistModalStore((s) => s.openEdit);
@@ -51,14 +71,21 @@ export function Playlist() {
   const [draftOrder, setDraftOrder] = useState<Track[] | null>(null);
 
   const localCollection = isLocal ? localAlbums.find((c) => c.id === id) : undefined;
-  const collection = isLocal ? localCollection : id ? findCollection(id) : undefined;
+  const collection = isLocal
+    ? localCollection
+    : isSoundCloud
+      ? (id ? scFindCollection(id) : undefined)
+      : id
+        ? findCollection(id)
+        : undefined;
 
   useEffect(() => {
     if (!id || isLocal) return;
     let cancelled = false;
     setRemoteLoading(true);
     setError(null);
-    getPlaylistDetail(id)
+    const fetch = isSoundCloud ? scGetPlaylistDetail(id) : getPlaylistDetail(id);
+    fetch
       .catch((e) => {
         if (!cancelled) setError(String(e));
       })
@@ -68,7 +95,7 @@ export function Playlist() {
     return () => {
       cancelled = true;
     };
-  }, [id, isLocal, getPlaylistDetail]);
+  }, [id, isLocal, isSoundCloud, getPlaylistDetail, scGetPlaylistDetail]);
 
   const localTrackList = useMemo(() => {
     if (!isLocal || !localCollection) return [];
@@ -78,24 +105,35 @@ export function Playlist() {
 
   const remoteTrackList = useMemo(() => {
     if (!id) return [];
-    // Home's bare songs are surfaced as synthetic single-track collections and
-    // have no playlist behind them to fetch.
+    if (isSoundCloud) {
+      // Home's bare songs are surfaced as synthetic single-track collections
+      // and have no playlist behind them to fetch.
+      if (id.startsWith(SC_SONG_PREFIX)) {
+        const track = scTrackCache[id.slice(SC_SONG_PREFIX.length)];
+        return track ? [track] : [];
+      }
+      return scDetail?.tracks ?? [];
+    }
     if (id.startsWith("song-")) {
       const track = trackCache[id.slice("song-".length)];
       return track ? [track] : [];
     }
     return detail?.tracks ?? [];
-  }, [id, detail, trackCache]);
+  }, [id, isSoundCloud, detail, scDetail, trackCache, scTrackCache]);
 
   const loading = isLocal ? false : remoteLoading;
   const storedTrackList = isLocal ? localTrackList : remoteTrackList;
   const trackList = draftOrder ?? storedTrackList;
-  const canEdit = !isLocal && detail?.owned === true;
+  const canEdit = isSoundCloud ? scDetail?.owned === true : !isLocal && detail?.owned === true;
 
   async function handleRemoveTrack(track: Track) {
     if (!id) return;
     try {
-      await removeTrackFromPlaylist(id, track);
+      if (isSoundCloud) {
+        await scRemoveTrackFromPlaylist(id, track);
+      } else {
+        await removeTrackFromPlaylist(id, track);
+      }
       toast.success(`Removed "${track.title}"`);
     } catch (e) {
       toast.error(String(e));
@@ -108,7 +146,11 @@ export function Playlist() {
     try {
       // Clears the draft only once the store holds the new order, so the list
       // never flashes back through its old arrangement.
-      await reorderPlaylistTracks(id, next);
+      if (isSoundCloud) {
+        await scReorderPlaylistTracks(id, next);
+      } else {
+        await reorderPlaylistTracks(id, next);
+      }
     } catch (e) {
       toast.error(String(e));
     } finally {
@@ -120,7 +162,11 @@ export function Playlist() {
     if (!id || deleting) return;
     setDeleting(true);
     try {
-      await deletePlaylist(id);
+      if (isSoundCloud) {
+        await scDeletePlaylist(id);
+      } else {
+        await deletePlaylist(id);
+      }
       toast.success("Playlist deleted");
       setConfirmingDelete(false);
       navigate("/library");
@@ -149,7 +195,18 @@ export function Playlist() {
     ]);
   }
 
-  if (!isLocal && authState !== "signed_in") {
+  if (isSoundCloud && scAuthState !== "signed_in") {
+    return (
+      <SignInPrompt
+        title="Connect your SoundCloud account"
+        message="Sign in with SoundCloud to see this playlist."
+        buttonLabel="Connect SoundCloud"
+        onSignIn={scOpenModal}
+      />
+    );
+  }
+
+  if (!isLocal && !isSoundCloud && authState !== "signed_in") {
     return <SignInPrompt />;
   }
 
@@ -219,8 +276,10 @@ export function Playlist() {
           <div className="flex items-center gap-4">
             <PlayControls onPlay={handlePlay} onShuffle={handleShuffle} />
             {/* Local albums and the synthetic single-song collections from the
-                home shelves have no YouTube Music page behind them. */}
-            {!isLocal && id && !id.startsWith("song-") && (
+                home shelves have no YouTube Music page behind them. SoundCloud
+                gets its own share affordance below since its links and "open
+                in" target are entirely different. */}
+            {!isLocal && !isSoundCloud && id && !id.startsWith("song-") && (
               <button
                 // Copies straight away: sharing a link is the common case, and
                 // a menu in front of a one-line action is friction. "Open in
@@ -247,6 +306,31 @@ export function Playlist() {
                       label: "Open in YouTube Music",
                       icon: ExternalLink,
                       onSelect: () => void openLink(collectionShareUrl(id)),
+                    },
+                  ]);
+                }}
+                className="flex h-10 w-10 items-center justify-center rounded-full text-muted transition-colors hover:bg-surface-2 hover:text-fg"
+                aria-label="Copy share link"
+                title="Copy share link"
+              >
+                <Share2 size={18} />
+              </button>
+            )}
+            {isSoundCloud && id && !id.startsWith(SC_SONG_PREFIX) && scDetail?.permalinkUrl && (
+              <button
+                onClick={() => void copyLink(scDetail.permalinkUrl!, "Playlist")}
+                onContextMenu={(e) => {
+                  e.preventDefault();
+                  openMenu(e.clientX, e.clientY, [
+                    {
+                      label: "Copy share link",
+                      icon: Link2,
+                      onSelect: () => void copyLink(scDetail.permalinkUrl!, "Playlist"),
+                    },
+                    {
+                      label: "Open in SoundCloud",
+                      icon: ExternalLink,
+                      onSelect: () => void openLink(scDetail.permalinkUrl!),
                     },
                   ]);
                 }}
@@ -296,8 +380,8 @@ export function Playlist() {
             >
               <h2 className="text-lg font-bold">Delete this playlist?</h2>
               <p className="mt-2 text-sm text-muted">
-                "{collection.title}" will be removed from your YouTube Music account. This can't be
-                undone.
+                "{collection.title}" will be removed from your {isSoundCloud ? "SoundCloud" : "YouTube Music"}{" "}
+                account. This can't be undone.
               </p>
               <div className="mt-6 flex justify-end gap-2">
                 <button

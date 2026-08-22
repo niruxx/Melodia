@@ -3,6 +3,8 @@ import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import { useLocation, useNavigate } from "react-router-dom";
 import { useEffect, useRef, useState } from "react";
 import { useAuthStore } from "../store/authStore";
+import { useScAuthStore } from "../store/scAuthStore";
+import { useSourceStore } from "../store/sourceStore";
 import { useDiscordStore } from "../store/discordStore";
 
 const DEBOUNCE_MS = 350;
@@ -39,7 +41,16 @@ export function TopBar() {
   const authState = useAuthStore((s) => s.state);
   const openModal = useAuthStore((s) => s.openModal);
   const doSignOut = useAuthStore((s) => s.doSignOut);
-  const isSignedIn = authState === "signed_in";
+  const scAuthState = useScAuthStore((s) => s.state);
+  const scOpenModal = useScAuthStore((s) => s.openModal);
+  const scDoSignOut = useScAuthStore((s) => s.doSignOut);
+  const activeSource = useSourceStore((s) => s.active);
+  const isSoundCloud = activeSource === "soundcloud";
+  const isLocal = activeSource === "local";
+  // The account badge always reflects whichever source is on screen — each
+  // one has its own separate sign-in, per sourceStore's "own tab, own state"
+  // convention — and disappears for Local, which has no account at all.
+  const isSignedIn = isSoundCloud ? scAuthState === "signed_in" : authState === "signed_in";
   const openSettings = useDiscordStore((s) => s.openSettings);
 
   // Read inside the debounce callback so it sees the current route without
@@ -202,20 +213,30 @@ export function TopBar() {
         >
           <Settings size={18} />
         </button>
-        <button
-          onClick={() => (isSignedIn ? setConfirmingSignOut(true) : openModal())}
-          title={isSignedIn ? "Signed in — click to sign out" : "Connect YouTube Music"}
-          className={
-            "flex h-8 w-8 items-center justify-center rounded-full text-xs font-semibold transition-transform hover:scale-105 " +
-            (isSignedIn ? "bg-accent text-black" : "bg-surface-3 text-fg")
-          }
-        >
-          Y
-        </button>
+        {!isLocal && (
+          <button
+            onClick={() =>
+              isSignedIn ? setConfirmingSignOut(true) : isSoundCloud ? scOpenModal() : openModal()
+            }
+            title={
+              isSignedIn
+                ? "Signed in — click to sign out"
+                : isSoundCloud
+                  ? "Connect SoundCloud"
+                  : "Connect YouTube Music"
+            }
+            className={
+              "flex h-8 w-8 items-center justify-center rounded-full text-xs font-semibold transition-transform hover:scale-105 " +
+              (isSignedIn ? "bg-accent text-black" : "bg-surface-3 text-fg")
+            }
+          >
+            {isSoundCloud ? "S" : "Y"}
+          </button>
+        )}
       </div>
 
-      {/* Signing out deletes the stored Google session and needs a full
-          re-login to undo, so it doesn't happen on a single stray click. */}
+      {/* Signing out deletes the stored session and needs a full re-login to
+          undo, so it doesn't happen on a single stray click. */}
       <AnimatePresence>
         {confirmingSignOut && (
           <>
@@ -233,9 +254,13 @@ export function TopBar() {
               transition={{ duration: 0.18 }}
               className="fixed left-1/2 top-1/2 z-50 w-full max-w-sm -translate-x-1/2 -translate-y-1/2 rounded-xl bg-surface-2 p-6 shadow-2xl"
             >
-              <h2 className="text-lg font-bold">Sign out of YouTube Music?</h2>
+              <h2 className="text-lg font-bold">
+                Sign out of {isSoundCloud ? "SoundCloud" : "YouTube Music"}?
+              </h2>
               <p className="mt-2 text-sm text-muted">
-                You&rsquo;ll need to sign in with Google again to get your library back.
+                {isSoundCloud
+                  ? "You'll need to sign in again to get your playlists and likes back."
+                  : "You'll need to sign in with Google again to get your library back."}
               </p>
               <div className="mt-6 flex justify-end gap-2">
                 <button
@@ -247,7 +272,7 @@ export function TopBar() {
                 <button
                   onClick={() => {
                     setConfirmingSignOut(false);
-                    void doSignOut();
+                    void (isSoundCloud ? scDoSignOut() : doSignOut());
                   }}
                   className="rounded-full bg-red-500 px-5 py-2 text-sm font-semibold text-white transition-transform hover:scale-105"
                 >

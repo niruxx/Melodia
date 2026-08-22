@@ -54,12 +54,13 @@ type PlayerState = {
 };
 
 const LOCAL_ID_PREFIX = "local:";
+const SC_ID_PREFIX = "sc:";
 
 /** Starts real audio playback for a track on this device (a no-op on the
  * device that's currently controlling another one — see each action's guard
  * above this being called only from local branches). Routes to the local
- * file-based engine for tracks from the Local source, YouTube stream
- * resolution otherwise. */
+ * file-based engine for tracks from the Local source, SoundCloud stream
+ * resolution for `sc:`-prefixed tracks, YouTube stream resolution otherwise. */
 function playReal(track: Track, onError: (message: string) => void) {
   if (track.id.startsWith(LOCAL_ID_PREFIX)) {
     const path = track.id.slice(LOCAL_ID_PREFIX.length);
@@ -67,6 +68,12 @@ function playReal(track: Track, onError: (message: string) => void) {
     // holds is what's heard — FLAC/ALAC/WAV stay bit-for-bit intact.
     usePlayerStore.setState({ streamFormat: null });
     invoke("playback_play_local", { path }).catch((e) => onError(String(e)));
+  } else if (track.id.startsWith(SC_ID_PREFIX)) {
+    const trackId = track.id.slice(SC_ID_PREFIX.length);
+    // SoundCloud has no quality tiers to report the way YouTube's format
+    // selection does — there's exactly one progressive stream to resolve to.
+    usePlayerStore.setState({ streamFormat: null });
+    invoke("playback_play_soundcloud", { trackId }).catch((e) => onError(String(e)));
   } else {
     const { streamQuality } = useAudioSettingsStore.getState();
     invoke<StreamFormat>("playback_play", { videoId: track.id, quality: streamQuality })

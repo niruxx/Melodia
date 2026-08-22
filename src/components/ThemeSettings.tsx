@@ -2,6 +2,9 @@ import clsx from "clsx";
 import { RotateCcw } from "lucide-react";
 import {
   GRADIENT_INTENSITIES,
+  MAX_UI_SCALE,
+  MIN_UI_SCALE,
+  UI_SCALE_STEP,
   UI_THEMES,
   useUiThemeStore,
   type UiTheme,
@@ -58,6 +61,8 @@ export function ThemeSettings() {
   const setWashSidebar = useUiThemeStore((s) => s.setWashSidebar);
   const washTitlebar = useUiThemeStore((s) => s.washTitlebar);
   const setWashTitlebar = useUiThemeStore((s) => s.setWashTitlebar);
+  const uiScale = useUiThemeStore((s) => s.uiScale);
+  const setUiScale = useUiThemeStore((s) => s.setUiScale);
   const wallpaper = useWallpaperStore((s) => s.enabled);
   const setWallpaper = useWallpaperStore((s) => s.setEnabled);
 
@@ -90,6 +95,45 @@ export function ThemeSettings() {
               <span className="text-[10px] font-semibold text-fg">{theme.label}</span>
             </button>
           ))}
+        </div>
+      </div>
+
+      <div className="flex flex-col gap-2">
+        <div className="flex items-center justify-between">
+          <div className="text-sm font-semibold">UI scale</div>
+          {uiScale !== 1 && (
+            <button
+              onClick={() => setUiScale(1)}
+              className="flex items-center gap-1 text-xs text-muted transition-colors hover:text-fg"
+            >
+              <RotateCcw size={11} />
+              Reset to 100%
+            </button>
+          )}
+        </div>
+        <div className="text-xs text-muted">
+          Zooms the whole interface — text, icons and layout together — the same way a browser's
+          zoom does.
+        </div>
+        <div className="flex items-center gap-3">
+          <input
+            type="range"
+            min={MIN_UI_SCALE}
+            max={MAX_UI_SCALE}
+            step={UI_SCALE_STEP}
+            value={uiScale}
+            onChange={(e) => setUiScale(Number(e.target.value))}
+            className="tb-range h-3 w-full"
+            style={
+              {
+                "--fill-pct": `${((uiScale - MIN_UI_SCALE) / (MAX_UI_SCALE - MIN_UI_SCALE)) * 100}%`,
+              } as React.CSSProperties
+            }
+            aria-label="UI scale"
+          />
+          <span className="w-12 shrink-0 text-right text-xs tabular-nums text-muted">
+            {Math.round(uiScale * 100)}%
+          </span>
         </div>
       </div>
 

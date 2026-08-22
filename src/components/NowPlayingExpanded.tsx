@@ -58,8 +58,10 @@ export function NowPlayingExpanded() {
   const loadVideo = useVideoStore((s) => s.load);
   const clearVideo = useVideoStore((s) => s.clear);
   const videoLoading = useVideoStore((s) => s.loadingFor !== null);
-  // Local files have no YouTube video behind them.
-  const canShowVideo = Boolean(track && !track.id.startsWith("local:"));
+  // Local files and SoundCloud tracks have no YouTube video behind them.
+  const canShowVideo = Boolean(
+    track && !track.id.startsWith("local:") && !track.id.startsWith("sc:"),
+  );
 
   // Resolve on demand rather than for every track: the lookup is a network
   // round trip, and most listening happens with video off.
@@ -86,7 +88,10 @@ export function NowPlayingExpanded() {
   // panel is dropped entirely instead of showing an empty one — same reasoning
   // as `canShowVideo` above.
   const isLocalMode = useSourceStore((s) => s.active === "local");
-  const canShowLyrics = Boolean(track && !isLocalMode && !track.id.startsWith("local:"));
+  // SoundCloud has no lyrics feature to fetch, same absence as local files.
+  const canShowLyrics = Boolean(
+    track && !isLocalMode && !track.id.startsWith("local:") && !track.id.startsWith("sc:"),
+  );
 
   useEffect(() => {
     if (!isExpanded || !track) return;

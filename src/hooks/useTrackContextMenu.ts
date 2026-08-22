@@ -15,6 +15,7 @@ import {
 } from "lucide-react";
 import { usePlayerStore } from "../store/playerStore";
 import { useAuthStore } from "../store/authStore";
+import { useScAuthStore } from "../store/scAuthStore";
 import { useContextMenuStore, type MenuItem } from "../store/contextMenuStore";
 import { usePlaylistModalStore } from "../store/playlistModalStore";
 import { toast } from "../store/toastStore";
@@ -42,7 +43,14 @@ export function useTrackContextMenu() {
     const player = usePlayerStore.getState();
     const liked = !!player.likedIds[track.id];
     const isLocal = track.id.startsWith("local:");
-    const isSignedIn = useAuthStore.getState().state === "signed_in";
+    const isSoundCloudTrack = track.id.startsWith("sc:");
+    // "Add to playlist" and the share/open links depend on whichever
+    // provider this specific track came from, not on the currently-active
+    // tab — a right-click on a SoundCloud card while browsing YouTube Music
+    // (e.g. from a mixed list) still needs SoundCloud's own sign-in state.
+    const isSignedIn = isSoundCloudTrack
+      ? useScAuthStore.getState().state === "signed_in"
+      : useAuthStore.getState().state === "signed_in";
 
     const items: MenuItem[] = [
       {
@@ -109,8 +117,16 @@ export function useTrackContextMenu() {
 
     items.push({ kind: "separator" });
 
-    // A local file has no YouTube page to point anyone at.
-    if (!isLocal) {
+    // A local file has no page to point anyone at. A SoundCloud track only
+    // has one if the API actually handed back its permalink (not every shape
+    // it returns includes one, e.g. a playlist stub).
+    if (isSoundCloudTrack && track.permalinkUrl) {
+      const url = track.permalinkUrl;
+      items.push(
+        { label: "Copy share link", icon: Link2, onSelect: () => void copyLink(url, "Song") },
+        { label: "Open in SoundCloud", icon: ExternalLink, onSelect: () => void openLink(url) },
+      );
+    } else if (!isLocal && !isSoundCloudTrack) {
       items.push(
         {
           label: "Copy share link",

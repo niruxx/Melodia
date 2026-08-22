@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { useNavigate } from "react-router-dom";
 import {
+  Cloud,
   Disc3,
   Heart,
   Home,
@@ -61,6 +62,12 @@ export function CommandPalette() {
         label: "Switch to YouTube Music",
         icon: MonitorPlay,
         run: () => useSourceStore.getState().setActive("youtube"),
+      },
+      {
+        id: "src-soundcloud",
+        label: "Switch to SoundCloud",
+        icon: Cloud,
+        run: () => useSourceStore.getState().setActive("soundcloud"),
       },
       {
         id: "src-local",
