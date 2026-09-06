@@ -893,6 +893,13 @@ wallpaper is only visible because the surfaces above it stop being opaque.
 
 Spotify and Soundcloud Support ( Tabbed )
 
+## AI usage disclaimer
+
+> [!NOTE]
+> Parts of Melodia — code, documentation, and this README included — were
+> written with the help of AI coding assistants. Everything is reviewed before
+> it ships, but if you spot something that looks off, please open an issue.
+
 ## Thanks
 
 - [ytmusicapi](https://github.com/sigma67/ytmusicapi) — the unofficial YouTube Music API this is built on
