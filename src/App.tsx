@@ -28,6 +28,7 @@ import { Toaster } from "./components/Toaster";
 import { CommandPalette } from "./components/CommandPalette";
 import { ShortcutsOverlay } from "./components/ShortcutsOverlay";
 import { MiniPlayer } from "./components/MiniPlayer";
+import { PictureInPictureSource } from "./components/PictureInPictureSource";
 import { useKeyboardShortcuts } from "./hooks/useKeyboardShortcuts";
 import { useMediaKeys } from "./hooks/useMediaKeys";
 import { useMiniPlayerStore } from "./store/miniPlayerStore";
@@ -196,6 +197,7 @@ function App() {
     return (
       <>
         <MiniPlayer />
+        <PictureInPictureSource />
         <Toaster />
       </>
     );
@@ -245,6 +247,7 @@ function App() {
       <SetupWizard />
       <UpdateNotes />
       <StreamAuthWarning />
+      <PictureInPictureSource />
       <Toaster />
       <GlobalShortcuts />
     </HashRouter>

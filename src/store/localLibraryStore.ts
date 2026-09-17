@@ -16,17 +16,24 @@ type LocalLibraryStore = {
 };
 
 function groupIntoAlbums(tracks: Track[]): Collection[] {
-  const byAlbum = new Map<string, Track[]>();
+  // Keyed by album artist as well as title: "Greatest Hits" and "Live" are
+  // common enough that grouping on the title alone merges unrelated albums
+  // into one. Falling back to the track artist keeps untagged files working.
+  const byAlbum = new Map<string, { album: string; artist: string; tracks: Track[] }>();
   for (const track of tracks) {
-    const key = track.album || "Unknown Album";
-    const list = byAlbum.get(key) ?? [];
-    list.push(track);
-    byAlbum.set(key, list);
+    const album = track.album || "Unknown Album";
+    const artist = track.albumArtist || track.artist || "";
+    // JSON rather than a joined string so an artist or album containing the
+    // separator can't collide with a different pair.
+    const key = JSON.stringify([artist.toLowerCase(), album.toLowerCase()]);
+    const entry = byAlbum.get(key) ?? { album, artist, tracks: [] };
+    entry.tracks.push(track);
+    byAlbum.set(key, entry);
   }
-  return Array.from(byAlbum.entries()).map(([album, albumTracks]) => ({
-    id: `local-album:${album}`,
+  return Array.from(byAlbum.entries()).map(([key, { album, artist, tracks: albumTracks }]) => ({
+    id: `local-album:${key}`,
     title: album,
-    subtitle: albumTracks[0]?.artist ?? "",
+    subtitle: artist,
     kind: "album" as const,
     trackIds: albumTracks.map((t) => t.id),
     thumbnail: albumTracks.find((t) => t.thumbnail)?.thumbnail,

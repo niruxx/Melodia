@@ -2,13 +2,20 @@ mod analyzer;
 mod artwork;
 mod background;
 mod commands;
+mod crossfeed;
 mod discord;
 mod equalizer;
+mod exclusive;
+mod gapless;
 mod google_login;
 mod local_library;
+mod lyrics;
 mod network;
+mod organize;
 mod playback;
 mod python;
+mod replaygain;
+mod resample;
 mod sidecar;
 mod soundcloud_login;
 mod update;
@@ -157,6 +164,8 @@ pub fn run() {
             commands::playback_play,
             commands::playback_play_soundcloud,
             commands::playback_play_local,
+            commands::playback_preload,
+            commands::playback_cancel_preload,
             commands::playback_list_outputs,
             commands::playback_set_output,
             commands::playback_pause,
@@ -165,10 +174,17 @@ pub fn run() {
             commands::playback_set_volume,
             commands::playback_set_fade_ms,
             commands::playback_set_eq,
+            commands::playback_set_crossfeed,
+            commands::playback_set_replay_gain,
             commands::playback_stop,
             local_library::local_get_folder,
             local_library::local_set_folder,
             local_library::local_scan,
+            lyrics::local_read_lyrics,
+            organize::organize_preview,
+            organize::organize_apply,
+            organize::organize_undo,
+            organize::organize_can_undo,
             artwork::artwork_palette,
             google_login::google_login_start,
             google_login::google_login_cancel,

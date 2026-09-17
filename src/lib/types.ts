@@ -12,6 +12,18 @@ export type Track = {
    * videoId) a bare SoundCloud track id can't be turned into a URL on its
    * own. */
   permalinkUrl?: string;
+
+  // Read from local files' tags only; streaming sources don't carry them.
+  /** Who the album is credited to, which is what albums are grouped by — a
+   * compilation's tracks each have their own `artist`. */
+  albumArtist?: string;
+  composers?: string[];
+  genres?: string[];
+  performers?: string[];
+  producers?: string[];
+  trackNumber?: number;
+  discNumber?: number;
+  year?: number;
 };
 
 export type PlaylistPrivacy = "PUBLIC" | "UNLISTED" | "PRIVATE";

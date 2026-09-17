@@ -1,6 +1,6 @@
 import { create } from "zustand";
 import { invoke } from "@tauri-apps/api/core";
-import { usePlayerStore } from "./playerStore";
+import { cancelGaplessPreload, usePlayerStore } from "./playerStore";
 import { toast } from "./toastStore";
 
 const FADE_MS_KEY = "melodia:fade-ms";
@@ -8,7 +8,12 @@ const EQ_BANDS_KEY = "melodia:eq-bands";
 const BACKGROUND_KEY = "melodia:run-in-background";
 const QUALITY_KEY = "melodia:stream-quality";
 const OUTPUT_KEY = "melodia:output-device";
+const CROSSFEED_KEY = "melodia:crossfeed";
+const REPLAYGAIN_KEY = "melodia:replaygain";
+const GAPLESS_KEY = "melodia:gapless";
 const DEFAULT_FADE_MS = 400;
+/** Enough to be clearly audible without collapsing the stereo image. */
+const DEFAULT_CROSSFEED_STRENGTH = 35;
 
 /** Must match `BAND_FREQS_HZ` in `src-tauri/src/equalizer.rs`. */
 export const EQ_BAND_FREQS_HZ = [60, 250, 1000, 4000, 12000] as const;
@@ -44,6 +49,18 @@ export const STREAM_QUALITIES: readonly { id: StreamQuality; label: string; hint
 
 export type OutputDevice = { id: string; name: string; isDefault: boolean };
 
+/**
+ * Track mode levels every song against every other; album mode keeps an
+ * album's own quiet-to-loud dynamics intact and levels whole albums instead.
+ */
+export type ReplayGainMode = "off" | "track" | "album";
+
+export const REPLAY_GAIN_MODES: readonly { id: ReplayGainMode; label: string; hint: string }[] = [
+  { id: "off", label: "Off", hint: "Play every file at its original level" },
+  { id: "track", label: "Track", hint: "Level every song against every other" },
+  { id: "album", label: "Album", hint: "Level albums, preserving their internal dynamics" },
+];
+
 /** What the engine actually served for the current track. */
 export type StreamFormat = { ext: string | null; abr: number | null; acodec: string | null };
 
@@ -60,8 +77,27 @@ type AudioSettingsStore = {
   outputDeviceId: string | null;
   outputDevices: OutputDevice[];
 
+  /** Mixes each channel into the other to ease headphone listening fatigue. */
+  crossfeedEnabled: boolean;
+  /** 0-100. Kept separately from `crossfeedEnabled` so toggling off and back
+   * on returns to the level that was chosen rather than a default. */
+  crossfeedStrength: number;
+
+  replayGainMode: ReplayGainMode;
+  replayGainPreampDb: number;
+  replayGainPreventClipping: boolean;
+
+  /** Queue the next track ahead of time so consecutive tracks join seamlessly. */
+  gapless: boolean;
+
   init: () => void;
+  setGapless: (value: boolean) => void;
   setFadeMs: (ms: number) => void;
+  setCrossfeedEnabled: (enabled: boolean) => void;
+  setCrossfeedStrength: (strength: number) => void;
+  setReplayGainMode: (mode: ReplayGainMode) => void;
+  setReplayGainPreampDb: (db: number) => void;
+  setReplayGainPreventClipping: (value: boolean) => void;
   setEqBand: (index: number, db: number) => void;
   applyEqPreset: (gains: readonly number[]) => void;
   resetEq: () => void;
@@ -83,6 +119,12 @@ export const useAudioSettingsStore = create<AudioSettingsStore>((set, get) => ({
   streamQuality: "best",
   outputDeviceId: null,
   outputDevices: [],
+  crossfeedEnabled: false,
+  crossfeedStrength: DEFAULT_CROSSFEED_STRENGTH,
+  replayGainMode: "off",
+  replayGainPreampDb: 0,
+  replayGainPreventClipping: true,
+  gapless: true,
 
   init: () => {
     const rawFade = localStorage.getItem(FADE_MS_KEY);
@@ -110,9 +152,67 @@ export const useAudioSettingsStore = create<AudioSettingsStore>((set, get) => ({
       : "best";
     const outputDeviceId = localStorage.getItem(OUTPUT_KEY);
 
-    set({ fadeMs, eqBands, runInBackground, streamQuality, outputDeviceId });
+    let crossfeedEnabled = false;
+    let crossfeedStrength = DEFAULT_CROSSFEED_STRENGTH;
+    const rawCrossfeed = localStorage.getItem(CROSSFEED_KEY);
+    if (rawCrossfeed) {
+      try {
+        const parsed = JSON.parse(rawCrossfeed);
+        if (typeof parsed?.enabled === "boolean") crossfeedEnabled = parsed.enabled;
+        if (Number.isFinite(parsed?.strength)) {
+          crossfeedStrength = Math.min(100, Math.max(0, parsed.strength));
+        }
+      } catch {
+        // corrupt value — fall through to the defaults
+      }
+    }
+
+    let replayGainMode: ReplayGainMode = "off";
+    let replayGainPreampDb = 0;
+    let replayGainPreventClipping = true;
+    const rawReplayGain = localStorage.getItem(REPLAYGAIN_KEY);
+    if (rawReplayGain) {
+      try {
+        const parsed = JSON.parse(rawReplayGain);
+        if (REPLAY_GAIN_MODES.some((m) => m.id === parsed?.mode)) replayGainMode = parsed.mode;
+        if (Number.isFinite(parsed?.preampDb)) {
+          replayGainPreampDb = Math.min(12, Math.max(-12, parsed.preampDb));
+        }
+        if (typeof parsed?.preventClipping === "boolean") {
+          replayGainPreventClipping = parsed.preventClipping;
+        }
+      } catch {
+        // corrupt value — fall through to the defaults
+      }
+    }
+
+    // On unless explicitly turned off: a live album or a continuous mix is
+    // simply broken with gaps in it.
+    const gapless = localStorage.getItem(GAPLESS_KEY) !== "false";
+
+    set({
+      gapless,
+      fadeMs,
+      eqBands,
+      runInBackground,
+      streamQuality,
+      outputDeviceId,
+      crossfeedEnabled,
+      crossfeedStrength,
+      replayGainMode,
+      replayGainPreampDb,
+      replayGainPreventClipping,
+    });
     invoke("playback_set_fade_ms", { ms: fadeMs }).catch(() => {});
     invoke("playback_set_eq", { bands: eqBands }).catch(() => {});
+    invoke("playback_set_crossfeed", {
+      strength: crossfeedEnabled ? crossfeedStrength : 0,
+    }).catch(() => {});
+    invoke("playback_set_replay_gain", {
+      mode: replayGainMode,
+      preampDb: replayGainPreampDb,
+      preventClipping: replayGainPreventClipping,
+    }).catch(() => {});
     // Rust owns this at close time, so it must be told the stored value even
     // when nothing has changed this session.
     invoke("set_background_mode", { enabled: runInBackground }).catch(() => {});
@@ -157,6 +257,92 @@ export const useAudioSettingsStore = create<AudioSettingsStore>((set, get) => ({
     localStorage.setItem(EQ_BANDS_KEY, JSON.stringify(FLAT_EQ));
     set({ eqBands: FLAT_EQ });
     invoke("playback_set_eq", { bands: FLAT_EQ }).catch(() => {});
+  },
+
+  setGapless: (value) => {
+    localStorage.setItem(GAPLESS_KEY, String(value));
+    set({ gapless: value });
+    if (!value) cancelGaplessPreload();
+  },
+
+  setCrossfeedEnabled: (enabled) => {
+    const { crossfeedStrength } = get();
+    localStorage.setItem(
+      CROSSFEED_KEY,
+      JSON.stringify({ enabled, strength: crossfeedStrength }),
+    );
+    set({ crossfeedEnabled: enabled });
+    invoke("playback_set_crossfeed", { strength: enabled ? crossfeedStrength : 0 }).catch(() => {});
+  },
+
+  setCrossfeedStrength: (strength) => {
+    const clamped = Math.min(100, Math.max(0, Math.round(strength)));
+    const { crossfeedEnabled } = get();
+    localStorage.setItem(
+      CROSSFEED_KEY,
+      JSON.stringify({ enabled: crossfeedEnabled, strength: clamped }),
+    );
+    set({ crossfeedStrength: clamped });
+    // Dragging the slider while the effect is off only stores the level; it
+    // would be surprising for it to switch itself on.
+    if (crossfeedEnabled) {
+      invoke("playback_set_crossfeed", { strength: clamped }).catch(() => {});
+    }
+  },
+
+  setReplayGainMode: (mode) => {
+    const { replayGainPreampDb, replayGainPreventClipping } = get();
+    localStorage.setItem(
+      REPLAYGAIN_KEY,
+      JSON.stringify({
+        mode,
+        preampDb: replayGainPreampDb,
+        preventClipping: replayGainPreventClipping,
+      }),
+    );
+    set({ replayGainMode: mode });
+    invoke("playback_set_replay_gain", {
+      mode,
+      preampDb: replayGainPreampDb,
+      preventClipping: replayGainPreventClipping,
+    }).catch(() => {});
+  },
+
+  setReplayGainPreampDb: (db) => {
+    const clamped = Math.min(12, Math.max(-12, db));
+    const { replayGainMode, replayGainPreventClipping } = get();
+    localStorage.setItem(
+      REPLAYGAIN_KEY,
+      JSON.stringify({
+        mode: replayGainMode,
+        preampDb: clamped,
+        preventClipping: replayGainPreventClipping,
+      }),
+    );
+    set({ replayGainPreampDb: clamped });
+    invoke("playback_set_replay_gain", {
+      mode: replayGainMode,
+      preampDb: clamped,
+      preventClipping: replayGainPreventClipping,
+    }).catch(() => {});
+  },
+
+  setReplayGainPreventClipping: (value) => {
+    const { replayGainMode, replayGainPreampDb } = get();
+    localStorage.setItem(
+      REPLAYGAIN_KEY,
+      JSON.stringify({
+        mode: replayGainMode,
+        preampDb: replayGainPreampDb,
+        preventClipping: value,
+      }),
+    );
+    set({ replayGainPreventClipping: value });
+    invoke("playback_set_replay_gain", {
+      mode: replayGainMode,
+      preampDb: replayGainPreampDb,
+      preventClipping: value,
+    }).catch(() => {});
   },
 
   setStreamQuality: (quality) => {

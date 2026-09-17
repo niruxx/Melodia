@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import {
   ChevronDown,
@@ -26,9 +26,24 @@ import { usePlayerStore } from "../store/playerStore";
 import { useAuthStore } from "../store/authStore";
 import { useSourceStore } from "../store/sourceStore";
 import { formatDuration } from "../lib/format";
-import { getLyrics } from "../lib/ytmusic";
+import { getLocalLyrics, getLyrics, type LyricLine } from "../lib/ytmusic";
 
-type LyricsState = { loading: boolean; lyrics: string | null; source: string | null; error: string | null };
+type LyricsState = {
+  loading: boolean;
+  lyrics: string | null;
+  /** Timed lines. Empty whenever only unsynced text is available. */
+  lines: LyricLine[];
+  source: string | null;
+  error: string | null;
+};
+
+const EMPTY_LYRICS: LyricsState = {
+  loading: false,
+  lyrics: null,
+  lines: [],
+  source: null,
+  error: null,
+};
 
 export function NowPlayingExpanded() {
   const isExpanded = usePlayerStore((s) => s.isExpanded);
@@ -75,45 +90,98 @@ export function NowPlayingExpanded() {
 
   const RepeatIcon = repeat === "one" ? Repeat1 : Repeat;
 
-  const [lyricsState, setLyricsState] = useState<LyricsState>({
-    loading: false,
-    lyrics: null,
-    source: null,
-    error: null,
-  });
+  // The richer tags a local file carries, as one line. Album artist is left
+  // out unless it differs from the track artist, where it's the interesting
+  // part (a compilation, a featured guest, a classical performer).
+  const trackDetails = useMemo(() => {
+    if (!track) return "";
+    const parts: string[] = [];
+    if (track.albumArtist && track.albumArtist !== track.artist) {
+      parts.push(track.albumArtist);
+    }
+    if (track.year) parts.push(String(track.year));
+    if (track.genres?.length) parts.push(track.genres.join(", "));
+    if (track.composers?.length) parts.push(`Composed by ${track.composers.join(", ")}`);
+    return parts.join(" · ");
+  }, [track?.id, track?.albumArtist, track?.artist, track?.year, track?.genres, track?.composers]);
 
-  // Lyrics are a YouTube Music lookup keyed by videoId, so they mean nothing
-  // here twice over: Local mode is a deliberate "don't talk to YouTube"
-  // setting, and a local file's id is a file path rather than a videoId. The
-  // panel is dropped entirely instead of showing an empty one — same reasoning
-  // as `canShowVideo` above.
+  const [lyricsState, setLyricsState] = useState<LyricsState>(EMPTY_LYRICS);
+
   const isLocalMode = useSourceStore((s) => s.active === "local");
-  // SoundCloud has no lyrics feature to fetch, same absence as local files.
+  const isLocalTrack = Boolean(track?.id.startsWith("local:"));
+  // A local file's lyrics come off the disk beside it, so they work with no
+  // account and in Local mode — which is deliberately "don't talk to
+  // YouTube". SoundCloud is the one source with nothing to read either way,
+  // so its panel is dropped rather than shown empty.
   const canShowLyrics = Boolean(
-    track && !isLocalMode && !track.id.startsWith("local:") && !track.id.startsWith("sc:"),
+    track && !track.id.startsWith("sc:") && (isLocalTrack || !isLocalMode),
   );
+  // Only the YouTube path needs an account; saying so in front of a local
+  // file's lyrics would be nonsense.
+  const lyricsNeedSignIn = canShowLyrics && !isLocalTrack && !isSignedIn;
 
   useEffect(() => {
     if (!isExpanded || !track) return;
-    if (!canShowLyrics || !isSignedIn) {
+    if (!canShowLyrics || lyricsNeedSignIn) {
       // Nothing to fetch — and the previous track's lyrics must not linger
       // behind a local one, or they'd reappear on the way back out.
-      setLyricsState({ loading: false, lyrics: null, source: null, error: null });
+      setLyricsState(EMPTY_LYRICS);
       return;
     }
+
     let cancelled = false;
-    setLyricsState({ loading: true, lyrics: null, source: null, error: null });
-    getLyrics(track.id)
+    setLyricsState({ ...EMPTY_LYRICS, loading: true });
+
+    const request = isLocalTrack
+      ? getLocalLyrics(track.id.slice("local:".length)).then((res) => ({
+          lyrics: res.plain,
+          lines: res.lines,
+          source: null as string | null,
+        }))
+      : getLyrics(track.id);
+
+    request
       .then((res) => {
-        if (!cancelled) setLyricsState({ loading: false, lyrics: res.lyrics, source: res.source, error: null });
+        if (cancelled) return;
+        setLyricsState({
+          loading: false,
+          lyrics: res.lyrics,
+          lines: res.lines,
+          source: res.source,
+          error: null,
+        });
       })
       .catch((e) => {
-        if (!cancelled) setLyricsState({ loading: false, lyrics: null, source: null, error: String(e) });
+        if (!cancelled) setLyricsState({ ...EMPTY_LYRICS, error: String(e) });
       });
     return () => {
       cancelled = true;
     };
-  }, [isExpanded, track?.id, isSignedIn, canShowLyrics]);
+  }, [isExpanded, track?.id, isLocalTrack, lyricsNeedSignIn, canShowLyrics]);
+
+  // Which timed line is current: the last one that has already started.
+  // -1 until the first line is due, so nothing is highlighted over an intro.
+  const activeLyricIndex = useMemo(() => {
+    const { lines } = lyricsState;
+    if (lines.length === 0) return -1;
+    const positionMs = progress * 1000;
+    let index = -1;
+    for (let i = 0; i < lines.length; i++) {
+      if (lines[i].startMs > positionMs) break;
+      index = i;
+    }
+    return index;
+  }, [lyricsState.lines, progress]);
+
+  const activeLyricRef = useRef<HTMLButtonElement>(null);
+  useEffect(() => {
+    const node = activeLyricRef.current;
+    if (!node) return;
+    // Framer's MotionConfig can't reach a native scroll, so reduced motion is
+    // honoured explicitly here.
+    const reduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    node.scrollIntoView({ block: "center", behavior: reduced ? "auto" : "smooth" });
+  }, [activeLyricIndex]);
 
   return (
     <AnimatePresence>
@@ -208,6 +276,13 @@ export function NowPlayingExpanded() {
                     {track.title}
                   </div>
                   <div className="mt-1 truncate text-muted">{track.artist}</div>
+                  {/* Only local files carry these; streaming sources return
+                      nothing to show here. */}
+                  {trackDetails && (
+                    <div className="mt-1 truncate text-xs text-muted/70" title={trackDetails}>
+                      {trackDetails}
+                    </div>
+                  )}
                 </div>
                 <LikeButton
                   liked={liked}
@@ -304,8 +379,10 @@ export function NowPlayingExpanded() {
                   Lyrics
                 </h3>
                 <div className="no-scrollbar min-h-0 flex-1 overflow-y-auto">
-                  {!isSignedIn && <p className="text-sm text-muted">Sign in to load lyrics.</p>}
-                  {isSignedIn && lyricsState.loading && (
+                  {lyricsNeedSignIn && (
+                    <p className="text-sm text-muted">Sign in to load lyrics.</p>
+                  )}
+                  {!lyricsNeedSignIn && lyricsState.loading && (
                     <div className="flex flex-col gap-3">
                       {[
                         "w-full",
@@ -321,24 +398,54 @@ export function NowPlayingExpanded() {
                       ))}
                     </div>
                   )}
-                  {isSignedIn && !lyricsState.loading && lyricsState.error && (
+                  {!lyricsNeedSignIn && !lyricsState.loading && lyricsState.error && (
                     <p className="text-sm text-red-400">{lyricsState.error}</p>
                   )}
-                  {isSignedIn &&
+                  {!lyricsNeedSignIn &&
                     !lyricsState.loading &&
                     !lyricsState.error &&
-                    !lyricsState.lyrics && (
-                      <p className="text-sm text-muted">Lyrics not available for this song.</p>
-                    )}
-                  {lyricsState.lyrics && (
-                    <>
-                      <p className="whitespace-pre-line text-sm leading-relaxed text-fg/90">
-                        {lyricsState.lyrics}
+                    !lyricsState.lyrics &&
+                    lyricsState.lines.length === 0 && (
+                      <p className="text-sm text-muted">
+                        {isLocalTrack
+                          ? "No lyrics found. Put an .lrc file next to the track to see them here."
+                          : "Lyrics not available for this song."}
                       </p>
+                    )}
+                  {lyricsState.lines.length > 0 ? (
+                    <div className="flex flex-col gap-1 py-[35%]">
+                      {lyricsState.lines.map((line, i) => (
+                        <button
+                          key={`${line.startMs}-${i}`}
+                          ref={i === activeLyricIndex ? activeLyricRef : undefined}
+                          onClick={() => seek(line.startMs / 1000)}
+                          className={clsx(
+                            "rounded px-2 py-1 text-left text-sm leading-relaxed transition-colors duration-300",
+                            i === activeLyricIndex
+                              ? "font-semibold text-fg"
+                              : "text-fg/40 hover:text-fg/70",
+                          )}
+                        >
+                          {/* An instrumental gap is a real line with no words;
+                              a dot keeps it clickable and visible. */}
+                          {line.text || "·"}
+                        </button>
+                      ))}
                       {lyricsState.source && (
-                        <p className="mt-4 text-xs text-muted">{lyricsState.source}</p>
+                        <p className="mt-4 px-2 text-xs text-muted">{lyricsState.source}</p>
                       )}
-                    </>
+                    </div>
+                  ) : (
+                    lyricsState.lyrics && (
+                      <>
+                        <p className="whitespace-pre-line text-sm leading-relaxed text-fg/90">
+                          {lyricsState.lyrics}
+                        </p>
+                        {lyricsState.source && (
+                          <p className="mt-4 text-xs text-muted">{lyricsState.source}</p>
+                        )}
+                      </>
+                    )
                   )}
                 </div>
               </div>

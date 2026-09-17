@@ -317,10 +317,26 @@ export async function movePlaylistItem(
   await invoke("ytm_move_playlist_item", { playlistId, setVideoId, beforeSetVideoId });
 }
 
+/** A timed lyric line. `lines` is empty when only unsynced text is available. */
+export type LyricLine = { startMs: number; text: string };
+
 export async function getLyrics(
   videoId: string,
-): Promise<{ lyrics: string | null; source: string | null }> {
-  return invoke("ytm_get_lyrics", { videoId });
+): Promise<{ lyrics: string | null; source: string | null; lines: LyricLine[] }> {
+  const res = await invoke<{
+    lyrics: string | null;
+    source: string | null;
+    lines?: LyricLine[];
+  }>("ytm_get_lyrics", { videoId });
+  // An older sidecar predates timestamps and omits the field entirely.
+  return { ...res, lines: res.lines ?? [] };
+}
+
+/** Reads a local file's lyrics: a sidecar `.lrc` first, then its own tags. */
+export async function getLocalLyrics(
+  path: string,
+): Promise<{ lines: LyricLine[]; plain: string | null }> {
+  return invoke("local_read_lyrics", { path });
 }
 
 export async function searchTracks(query: string): Promise<Track[]> {

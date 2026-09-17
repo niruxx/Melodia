@@ -141,6 +141,8 @@ cross-platform, it simply hasn't been verified there.
 ### 🎛️ Sound
 
 - 5-band equalizer with 8 presets
+- ReplayGain volume normalization, track or album
+- Headphone crossfeed to ease listening fatigue
 - Pick your output device
 - Streaming quality: Best / Balanced / Data saver
 - Lossless local playback — FLAC, ALAC, WAV, AIFF
@@ -166,7 +168,8 @@ cross-platform, it simply hasn't been verified there.
 - Add, remove and reorder songs
 - Liked Songs, always pinned
 - Suggested shelf that keeps cycling
-- Lyrics in the fullscreen player
+- Synced, clickable lyrics — `.lrc` files or timed YouTube lyrics
+- Album artist, composer, genre and disc/track tags read from local files
 - Copy a share link for any song or playlist
 
 </td><td valign="top">
@@ -318,8 +321,17 @@ work from even if the installed copy goes missing.
 
 1. Open **Settings** → **Local music folder** → **Choose folder…**
 2. Melodia scans it for `.mp3`, `.m4a`, `.aac`, `.flac`, `.wav` and `.ogg`,
-   reading title, artist, album and cover art from each file's tags
+   reading title, artist, album, album artist, composer, genre, year,
+   disc/track numbers and cover art from each file's tags
 3. Switch to the **Local** tab in the sidebar
+
+Albums are grouped by **album artist**, so two different *Greatest Hits* stay
+apart, and tracks play in disc/track order rather than whatever order the
+folder scan happened to produce.
+
+Drop an `.lrc` file next to a track (`song.flac` → `song.lrc`) and its lyrics
+show up in the fullscreen player, scrolling in time and clickable to seek.
+Lyrics embedded in the file's own tags work too.
 
 Lossless formats play bit-for-bit — no re-encoding.
 

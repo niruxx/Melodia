@@ -3,7 +3,8 @@ use tauri::State;
 
 use crate::discord::Discord;
 use crate::equalizer::BAND_COUNT;
-use crate::playback::Playback;
+use crate::playback::{Playback, PlaySource};
+use crate::replaygain::ReplayGainMode;
 use crate::sidecar::Sidecar;
 
 #[tauri::command]
@@ -472,13 +473,14 @@ pub fn playback_set_output(
     playback.set_output_device(device_id)
 }
 
-#[tauri::command]
-pub async fn playback_play(
-    sidecar: State<'_, Sidecar>,
-    playback: State<'_, Playback>,
-    video_id: String,
+/// Resolves a YouTube track to a playable stream, plus a description of what
+/// was actually served — which isn't always what was asked for, since a track
+/// with no stream at the requested codec/bitrate falls back.
+async fn resolve_youtube(
+    sidecar: &Sidecar,
+    video_id: &str,
     quality: Option<String>,
-) -> Result<Value, String> {
+) -> Result<(PlaySource, Value), String> {
     let data = sidecar
         .call(
             "get_stream_url",
@@ -502,23 +504,15 @@ pub async fn playback_play(
                 .collect()
         })
         .unwrap_or_default();
-    playback.play(url, headers)?;
-
-    // Hand back what was actually served, which isn't always what was asked
-    // for — a track with no stream at the requested codec/bitrate falls back.
-    Ok(serde_json::json!({
+    let format = serde_json::json!({
         "ext": data.get("ext").cloned().unwrap_or(Value::Null),
         "abr": data.get("abr").cloned().unwrap_or(Value::Null),
         "acodec": data.get("acodec").cloned().unwrap_or(Value::Null),
-    }))
+    });
+    Ok((PlaySource::Remote(url, headers), format))
 }
 
-#[tauri::command]
-pub async fn playback_play_soundcloud(
-    sidecar: State<'_, Sidecar>,
-    playback: State<'_, Playback>,
-    track_id: String,
-) -> Result<Value, String> {
+async fn resolve_soundcloud(sidecar: &Sidecar, track_id: &str) -> Result<PlaySource, String> {
     let data = sidecar
         .call("sc_get_stream_url", serde_json::json!({ "trackId": track_id }))
         .await?;
@@ -529,13 +523,61 @@ pub async fn playback_play_soundcloud(
         .to_string();
     // The resolved URL is already a fully-signed CDN link — no extra headers
     // are needed the way YouTube's stream URLs need yt-dlp's browser-shaped ones.
-    playback.play(url, std::collections::HashMap::new())?;
+    Ok(PlaySource::Remote(url, std::collections::HashMap::new()))
+}
+
+#[tauri::command]
+pub async fn playback_play(
+    sidecar: State<'_, Sidecar>,
+    playback: State<'_, Playback>,
+    video_id: String,
+    quality: Option<String>,
+) -> Result<Value, String> {
+    let (source, format) = resolve_youtube(&sidecar, &video_id, quality).await?;
+    playback.play_source(source)?;
+    Ok(format)
+}
+
+#[tauri::command]
+pub async fn playback_play_soundcloud(
+    sidecar: State<'_, Sidecar>,
+    playback: State<'_, Playback>,
+    track_id: String,
+) -> Result<Value, String> {
+    let source = resolve_soundcloud(&sidecar, &track_id).await?;
+    playback.play_source(source)?;
     Ok(serde_json::json!({}))
+}
+
+/// Queues the track expected next so it follows the current one with no gap.
+/// Takes the frontend's track id (`local:` / `sc:` prefixed, or a YouTube
+/// videoId) and returns the stream format for YouTube tracks, `null` otherwise.
+#[tauri::command]
+pub async fn playback_preload(
+    sidecar: State<'_, Sidecar>,
+    playback: State<'_, Playback>,
+    track_id: String,
+    quality: Option<String>,
+) -> Result<Value, String> {
+    let (source, format) = if let Some(path) = track_id.strip_prefix("local:") {
+        (PlaySource::Local(path.to_string()), Value::Null)
+    } else if let Some(sc_id) = track_id.strip_prefix("sc:") {
+        (resolve_soundcloud(&sidecar, sc_id).await?, Value::Null)
+    } else {
+        resolve_youtube(&sidecar, &track_id, quality).await?
+    };
+    playback.preload(source, track_id)?;
+    Ok(format)
+}
+
+#[tauri::command]
+pub fn playback_cancel_preload(playback: State<'_, Playback>) -> Result<(), String> {
+    playback.cancel_preload()
 }
 
 #[tauri::command]
 pub fn playback_play_local(playback: State<'_, Playback>, path: String) -> Result<(), String> {
-    playback.play_local(path)
+    playback.play_source(PlaySource::Local(path))
 }
 
 #[tauri::command]
@@ -569,6 +611,21 @@ pub fn playback_set_eq(
     bands: [f32; BAND_COUNT],
 ) -> Result<(), String> {
     playback.set_eq(bands)
+}
+
+#[tauri::command]
+pub fn playback_set_crossfeed(playback: State<'_, Playback>, strength: u32) -> Result<(), String> {
+    playback.set_crossfeed(strength)
+}
+
+#[tauri::command]
+pub fn playback_set_replay_gain(
+    playback: State<'_, Playback>,
+    mode: ReplayGainMode,
+    preamp_db: f32,
+    prevent_clipping: bool,
+) -> Result<(), String> {
+    playback.set_replay_gain(mode, preamp_db, prevent_clipping)
 }
 
 #[tauri::command]

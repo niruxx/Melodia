@@ -663,16 +663,57 @@ def cmd_get_account_info(_args):
     }
 
 
+def _lyric_field(item, name):
+    """Reads a field from a ytmusicapi lyric line, which has been both a plain
+    dict and an object across versions."""
+    if isinstance(item, dict):
+        return item.get(name)
+    return getattr(item, name, None)
+
+
 def cmd_get_lyrics(args):
     yt = require_client()
     watch = yt.get_watch_playlist(videoId=args["videoId"])
     browse_id = watch.get("lyrics")
     if not browse_id:
-        return {"lyrics": None, "source": None}
-    result = yt.get_lyrics(browse_id)
+        return {"lyrics": None, "source": None, "lines": []}
+
+    # Timestamped lyrics are a newer ytmusicapi feature, and not every track
+    # has them even where supported. Falling back to the plain call keeps
+    # lyrics working rather than losing them to an unsupported keyword.
+    try:
+        result = yt.get_lyrics(browse_id, timestamps=True)
+    except Exception:
+        try:
+            result = yt.get_lyrics(browse_id)
+        except Exception:
+            return {"lyrics": None, "source": None, "lines": []}
+
     if not result:
-        return {"lyrics": None, "source": None}
-    return {"lyrics": result.get("lyrics"), "source": result.get("source")}
+        return {"lyrics": None, "source": None, "lines": []}
+
+    raw = result.get("lyrics")
+    source = result.get("source")
+
+    # With timestamps the payload is a list of lines; without, a single string.
+    if isinstance(raw, str) or raw is None:
+        return {"lyrics": raw, "source": source, "lines": []}
+
+    lines = []
+    for item in raw:
+        text = _lyric_field(item, "text")
+        start = _lyric_field(item, "start_time")
+        if text is None or start is None:
+            continue
+        lines.append({"startMs": int(start), "text": text})
+
+    return {
+        # Kept populated so a client that can't render synced lyrics, or a
+        # track whose lines lack usable times, still has something to show.
+        "lyrics": "\n".join(line["text"] for line in lines) or None,
+        "source": source,
+        "lines": lines,
+    }
 
 
 # YouTube Music tops out around 256 kbps AAC/Opus — there is no lossless tier

@@ -7,6 +7,7 @@ import { useDiscordStore } from "../store/discordStore";
 import {
   EQ_BAND_FREQS_HZ,
   EQ_PRESETS,
+  REPLAY_GAIN_MODES,
   STREAM_QUALITIES,
   useAudioSettingsStore,
 } from "../store/audioSettingsStore";
@@ -17,6 +18,7 @@ import { useStreamAuthStore } from "../store/streamAuthStore";
 import { useScAuthStore } from "../store/scAuthStore";
 import { useScAccountStore } from "../store/scAccountStore";
 import { ThemeSettings } from "./ThemeSettings";
+import { OrganizeSettings } from "./OrganizeSettings";
 import { useLocalLibraryStore } from "../store/localLibraryStore";
 import { APP_VERSION } from "../lib/version";
 
@@ -35,6 +37,21 @@ export function SettingsModal() {
   const setEqBand = useAudioSettingsStore((s) => s.setEqBand);
   const applyEqPreset = useAudioSettingsStore((s) => s.applyEqPreset);
   const resetEq = useAudioSettingsStore((s) => s.resetEq);
+
+  const gapless = useAudioSettingsStore((s) => s.gapless);
+  const setGapless = useAudioSettingsStore((s) => s.setGapless);
+  const crossfeedEnabled = useAudioSettingsStore((s) => s.crossfeedEnabled);
+  const crossfeedStrength = useAudioSettingsStore((s) => s.crossfeedStrength);
+  const setCrossfeedEnabled = useAudioSettingsStore((s) => s.setCrossfeedEnabled);
+  const setCrossfeedStrength = useAudioSettingsStore((s) => s.setCrossfeedStrength);
+  const replayGainMode = useAudioSettingsStore((s) => s.replayGainMode);
+  const replayGainPreampDb = useAudioSettingsStore((s) => s.replayGainPreampDb);
+  const replayGainPreventClipping = useAudioSettingsStore((s) => s.replayGainPreventClipping);
+  const setReplayGainMode = useAudioSettingsStore((s) => s.setReplayGainMode);
+  const setReplayGainPreampDb = useAudioSettingsStore((s) => s.setReplayGainPreampDb);
+  const setReplayGainPreventClipping = useAudioSettingsStore(
+    (s) => s.setReplayGainPreventClipping,
+  );
 
   const streamQuality = useAudioSettingsStore((s) => s.streamQuality);
   const setStreamQuality = useAudioSettingsStore((s) => s.setStreamQuality);
@@ -215,6 +232,28 @@ export function SettingsModal() {
                   </button>
                 </div>
                 {localError && <p className="text-sm text-red-400">{localError}</p>}
+              </div>
+
+              <OrganizeSettings />
+
+              <div className="mt-2 flex items-center justify-between gap-3">
+                <div className="min-w-0">
+                  <div className="text-sm font-semibold">Gapless playback</div>
+                  <div className="text-xs text-muted">
+                    Lines up the next track before this one ends so they join without a pause —
+                    essential for live albums and continuous mixes. Tracks that follow on
+                    automatically skip the fade below.
+                  </div>
+                </div>
+                <button
+                  onClick={() => setGapless(!gapless)}
+                  className={
+                    "shrink-0 rounded-full px-4 py-1.5 text-xs font-semibold transition-colors " +
+                    (gapless ? "bg-accent text-black" : "bg-surface-3 text-fg hover:bg-surface-3/70")
+                  }
+                >
+                  {gapless ? "On" : "Off"}
+                </button>
               </div>
 
               <div className="mt-2 flex flex-col gap-1.5">
@@ -427,6 +466,119 @@ export function SettingsModal() {
                     </div>
                   ))}
                 </div>
+              </div>
+
+              <div className="mt-2 flex flex-col gap-1.5">
+                <div className="text-sm font-semibold">Volume normalization</div>
+                <div className="text-xs text-muted">
+                  Evens out how loud tracks are using the ReplayGain values written into your
+                  files. Local files only — streams arrive already normalized and carry no tags,
+                  and files without tags are left exactly as they are.
+                </div>
+                <div className="flex gap-2">
+                  {REPLAY_GAIN_MODES.map((m) => (
+                    <button
+                      key={m.id}
+                      onClick={() => setReplayGainMode(m.id)}
+                      title={m.hint}
+                      className={clsx(
+                        "pill flex-1 px-3 py-1.5 text-xs font-semibold transition-colors",
+                        replayGainMode === m.id
+                          ? "bg-fg text-black"
+                          : "bg-surface-3 text-fg hover:bg-surface-3/70",
+                      )}
+                    >
+                      {m.label}
+                    </button>
+                  ))}
+                </div>
+                {replayGainMode !== "off" && (
+                  <>
+                    <div className="mt-1 flex items-center justify-between">
+                      <div className="text-xs text-muted">Preamp</div>
+                      <span className="shrink-0 text-xs tabular-nums text-muted">
+                        {replayGainPreampDb > 0 ? `+${replayGainPreampDb}` : replayGainPreampDb} dB
+                      </span>
+                    </div>
+                    <input
+                      type="range"
+                      min={-12}
+                      max={12}
+                      step={1}
+                      value={replayGainPreampDb}
+                      onChange={(e) => setReplayGainPreampDb(Number(e.target.value))}
+                      className="tb-range h-3 w-full"
+                      style={
+                        { "--fill-pct": `${((replayGainPreampDb + 12) / 24) * 100}%` } as React.CSSProperties
+                      }
+                      aria-label="ReplayGain preamp"
+                    />
+                    <div className="flex items-center justify-between gap-3">
+                      <div className="min-w-0">
+                        <div className="text-xs font-semibold">Prevent clipping</div>
+                        <div className="text-xs text-muted">
+                          Holds back any boost that would push a loud master past full scale.
+                        </div>
+                      </div>
+                      <button
+                        onClick={() => setReplayGainPreventClipping(!replayGainPreventClipping)}
+                        className={
+                          "shrink-0 rounded-full px-4 py-1.5 text-xs font-semibold transition-colors " +
+                          (replayGainPreventClipping
+                            ? "bg-accent text-black"
+                            : "bg-surface-3 text-fg hover:bg-surface-3/70")
+                        }
+                      >
+                        {replayGainPreventClipping ? "On" : "Off"}
+                      </button>
+                    </div>
+                  </>
+                )}
+              </div>
+
+              <div className="mt-2 flex flex-col gap-1.5">
+                <div className="flex items-center justify-between gap-3">
+                  <div className="min-w-0">
+                    <div className="text-sm font-semibold">Headphone crossfeed</div>
+                    <div className="text-xs text-muted">
+                      Feeds a little of each channel into the other, the way both ears hear both
+                      speakers in a room. Eases the fatigue of hard-panned mixes on headphones —
+                      leave it off on speakers.
+                    </div>
+                  </div>
+                  <button
+                    onClick={() => setCrossfeedEnabled(!crossfeedEnabled)}
+                    className={
+                      "shrink-0 rounded-full px-4 py-1.5 text-xs font-semibold transition-colors " +
+                      (crossfeedEnabled
+                        ? "bg-accent text-black"
+                        : "bg-surface-3 text-fg hover:bg-surface-3/70")
+                    }
+                  >
+                    {crossfeedEnabled ? "On" : "Off"}
+                  </button>
+                </div>
+                {crossfeedEnabled && (
+                  <>
+                    <div className="flex items-center justify-between">
+                      <div className="text-xs text-muted">Strength</div>
+                      <span className="shrink-0 text-xs tabular-nums text-muted">
+                        {crossfeedStrength}%
+                      </span>
+                    </div>
+                    <input
+                      type="range"
+                      min={0}
+                      max={100}
+                      step={5}
+                      value={crossfeedStrength}
+                      onChange={(e) => setCrossfeedStrength(Number(e.target.value))}
+                      className="tb-range h-3 w-full"
+                      style={{ "--fill-pct": `${crossfeedStrength}%` } as React.CSSProperties}
+                      aria-label="Crossfeed strength"
+                    />
+                  </>
+                )}
               </div>
 
               <ThemeSettings />

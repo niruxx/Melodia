@@ -51,10 +51,72 @@ type PlayerState = {
   setQueueOpen: (value: boolean) => void;
   setRemoteSender: (fn: ((cmd: RemoteCommand) => void) | null) => void;
   applyRemoteState: (state: RemoteState) => void;
+  /** Repoints tracks whose ids changed — local files moved on disk. */
+  remapTrackIds: (mapping: Record<string, string>) => void;
 };
 
 const LOCAL_ID_PREFIX = "local:";
 const SC_ID_PREFIX = "sc:";
+
+/** How long before a track ends its successor is fetched and queued. Long
+ * enough to cover a slow stream resolve; short enough that a queue edited
+ * mid-song rarely has to throw a preload away. */
+const PRELOAD_LEAD_SECONDS = 30;
+
+/** The track the engine has been asked to queue next, and where it sits. */
+type Preload = { index: number; id: string; format: StreamFormat | null };
+let preloaded: Preload | null = null;
+
+type QueueShape = Pick<PlayerState, "queue" | "queueIndex" | "shuffle" | "repeat">;
+
+/** What `next()` would play, or null at the end of a non-repeating queue.
+ * Shuffle's pick is random, so it's made once here and remembered in the
+ * preload rather than rolled again when the track actually changes. */
+function pickNextIndex({ queue, queueIndex, shuffle, repeat }: QueueShape): number | null {
+  if (queue.length === 0) return null;
+  if (repeat === "one") return queueIndex;
+  if (shuffle) return Math.floor(Math.random() * queue.length);
+  if (queueIndex + 1 < queue.length) return queueIndex + 1;
+  return repeat === "all" ? 0 : null;
+}
+
+/** Whether a preload still matches what should play next after an edit. */
+function preloadStillValid(p: Preload, s: QueueShape): boolean {
+  if (s.queue[p.index]?.id !== p.id) return false;
+  if (s.repeat === "one") return p.index === s.queueIndex;
+  // Any other track is as good a shuffle pick as the one that was rolled.
+  if (s.shuffle) return p.index !== s.queueIndex;
+  return pickNextIndex(s) === p.index;
+}
+
+/** Drops the preload locally and in the engine. */
+function cancelPreload() {
+  if (!preloaded) return;
+  preloaded = null;
+  invoke("playback_cancel_preload").catch(() => {});
+}
+
+function requestPreload() {
+  const state = usePlayerStore.getState();
+  if (preloaded || state.remoteSend || !state.isPlaying) return;
+  if (!useAudioSettingsStore.getState().gapless) return;
+  const index = pickNextIndex(state);
+  if (index === null) return;
+  const track = state.queue[index];
+  const entry: Preload = { index, id: track.id, format: null };
+  // Claimed before the request so position ticks don't fire duplicates.
+  preloaded = entry;
+  invoke<StreamFormat | null>("playback_preload", {
+    trackId: track.id,
+    quality: useAudioSettingsStore.getState().streamQuality,
+  })
+    .then((format) => {
+      if (preloaded === entry) entry.format = format;
+    })
+    // Left claimed on failure: retrying every tick would hammer the helper,
+    // and the normal end-of-track path plays (and reports) it anyway.
+    .catch(() => {});
+}
 
 /** Starts real audio playback for a track on this device (a no-op on the
  * device that's currently controlling another one — see each action's guard
@@ -158,9 +220,12 @@ export const usePlayerStore = create<PlayerState>((set, get) => ({
       invoke("playback_seek", { seconds: 0 }).catch((e) => set({ playbackError: String(e) }));
       return;
     }
-    let nextIndex = shuffle
-      ? Math.floor(Math.random() * queue.length)
-      : queueIndex + 1;
+    // Honour an already-made shuffle pick, so skipping lands on the track the
+    // engine had lined up rather than rolling a different one.
+    const planned = preloaded && preloadStillValid(preloaded, get()) ? preloaded.index : null;
+    preloaded = null;
+    let nextIndex =
+      planned ?? (shuffle ? Math.floor(Math.random() * queue.length) : queueIndex + 1);
     if (nextIndex >= queue.length) {
       if (repeat === "all") {
         nextIndex = 0;
@@ -314,7 +379,26 @@ export const usePlayerStore = create<PlayerState>((set, get) => ({
   setExpanded: (value) => set({ isExpanded: value }),
   setQueueOpen: (value) => set({ isQueueOpen: value }),
 
-  setRemoteSender: (fn) => set({ remoteSend: fn }),
+  setRemoteSender: (fn) => {
+    // Playback is about to be driven from elsewhere; nothing local follows.
+    if (fn) cancelPreload();
+    set({ remoteSend: fn });
+  },
+
+  remapTrackIds: (mapping) => {
+    const { queue, likedIds } = get();
+    if (!queue.some((t) => t.id in mapping) && !Object.keys(likedIds).some((id) => id in mapping)) {
+      return;
+    }
+    const nextLiked: Record<string, boolean> = {};
+    for (const [id, liked] of Object.entries(likedIds)) {
+      nextLiked[mapping[id] ?? id] = liked;
+    }
+    set({
+      queue: queue.map((t) => (t.id in mapping ? { ...t, id: mapping[t.id] } : t)),
+      likedIds: nextLiked,
+    });
+  },
 
   applyRemoteState: (state) =>
     set({
@@ -348,12 +432,61 @@ listen<number>("playback:position", (event) => {
   // left behind by an earlier, since-superseded fetch that failed after this
   // one had already started succeeding.
   usePlayerStore.setState({ progress: event.payload, playbackError: null });
+
+  const duration = usePlayerStore.getState().currentTrack()?.duration ?? 0;
+  if (duration > 0 && duration - event.payload <= PRELOAD_LEAD_SECONDS) {
+    requestPreload();
+  }
 });
+
+// The engine moved onto the queued track by itself, with no gap. Follow it
+// without calling `playReal` — the audio is already playing.
+listen<string>("playback:advanced", (event) => {
+  const planned = preloaded;
+  preloaded = null;
+  const state = usePlayerStore.getState();
+  if (state.remoteSend) return;
+  const index =
+    planned && planned.id === event.payload && state.queue[planned.index]?.id === planned.id
+      ? planned.index
+      : state.queue.findIndex((t) => t.id === event.payload);
+  if (index < 0) return;
+  usePlayerStore.setState({
+    queueIndex: index,
+    progress: 0,
+    isPlaying: true,
+    playbackError: null,
+    streamFormat: planned?.id === event.payload ? planned.format : null,
+  });
+});
+
+// Editing the queue, or the shuffle/repeat rules, can change what comes next.
+usePlayerStore.subscribe((s, prev) => {
+  if (!preloaded) return;
+  if (
+    s.queue === prev.queue &&
+    s.queueIndex === prev.queueIndex &&
+    s.shuffle === prev.shuffle &&
+    s.repeat === prev.repeat
+  ) {
+    return;
+  }
+  if (!preloadStillValid(preloaded, s)) cancelPreload();
+});
+
+/** For the gapless setting being switched off. */
+export function cancelGaplessPreload() {
+  cancelPreload();
+}
 
 // Switching output device tears down the sink the player was wired to, so the
 // track has to be restarted. Jump back to where it was rather than silently
 // dropping to the start or stopping altogether.
 listen<{ wasPlaying: boolean; position: number | null }>("playback:output-changed", (event) => {
+  // The engine dropped its queued successor along with the old sink,
+  // whether or not anything was playing.
+  preloaded = null;
+
   const state = usePlayerStore.getState();
   if (state.remoteSend || !event.payload.wasPlaying) return;
   const track = state.currentTrack();

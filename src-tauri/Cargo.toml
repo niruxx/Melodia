@@ -38,6 +38,21 @@ base64 = "0.22"
 # enabled — default features pull in a much larger format matrix than needed.
 image = { version = "0.25", default-features = false, features = ["jpeg", "png", "webp", "gif"] }
 rustfft = "6"
+# Band-limited resampling. rodio's own converter is linear interpolation,
+# which aliases audibly on 44.1 ↔ 48 kHz conversions.
+rubato = "5"
 tauri-plugin-global-shortcut = "2.3.2"
 url = "2.5.8"
+
+# WASAPI exclusive mode for bit-perfect output, which cpal doesn't offer.
+# Pinned to the same release cpal already builds so it isn't compiled twice.
+[target.'cfg(windows)'.dependencies]
+windows = { version = "0.61", features = [
+    "Win32_Foundation",
+    "Win32_Media_Audio",
+    "Win32_Media_KernelStreaming",
+    "Win32_Media_Multimedia",
+    "Win32_System_Com",
+    "Win32_System_Threading",
+] }
 

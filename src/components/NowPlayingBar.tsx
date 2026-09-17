@@ -5,6 +5,7 @@ import {
   Maximize2,
   MessageSquare,
   Pause,
+  PictureInPicture,
   PictureInPicture2,
   Play,
   Repeat,
@@ -25,6 +26,7 @@ import { ShuffleButton } from "./ShuffleButton";
 import { usePlayerStore } from "../store/playerStore";
 import { useNetworkStore } from "../store/networkStore";
 import { useMiniPlayerStore } from "../store/miniPlayerStore";
+import { usePipStore } from "../store/pipStore";
 import { useCommentsStore } from "../store/commentsStore";
 import { copyLink, trackShareUrl } from "../lib/share";
 import { formatDuration } from "../lib/format";
@@ -62,6 +64,9 @@ export function NowPlayingBar() {
 
   const playbackError = usePlayerStore((s) => s.playbackError);
   const toggleMini = useMiniPlayerStore((s) => s.toggle);
+  const pipSupported = usePipStore((s) => s.supported);
+  const pipActive = usePipStore((s) => s.active);
+  const togglePip = usePipStore((s) => s.toggle);
 
   const VolumeIcon = volume === 0 ? VolumeX : volume < 0.5 ? Volume1 : Volume2;
   const RepeatIcon = repeat === "one" ? Repeat1 : Repeat;
@@ -224,6 +229,23 @@ export function NowPlayingBar() {
             title="Mini player"
           >
             <PictureInPicture2 size={16} />
+          </motion.button>
+          <motion.button
+            whileTap={tap}
+            onClick={() => togglePip()}
+            disabled={!pipSupported}
+            className={clsx(
+              "text-muted transition-colors hover:text-fg disabled:opacity-40",
+              pipActive && "text-accent",
+            )}
+            aria-label="Picture-in-picture"
+            title={
+              pipSupported
+                ? "Float the visualizer in a picture-in-picture window"
+                : "Picture-in-picture isn't available on this platform yet"
+            }
+          >
+            <PictureInPicture size={16} />
           </motion.button>
           <motion.button
             whileTap={tap}
